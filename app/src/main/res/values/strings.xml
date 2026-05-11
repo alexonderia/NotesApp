@@ -1,0 +1,18 @@
+<resources>
+    <string name="app_name">NotesApp</string>
+    <string name="notes_title">Заметки</string>
+    <string name="notes_empty_title">Пока нет заметок</string>
+    <string name="notes_empty_subtitle">Создайте первую заметку кнопкой «+» внизу справа.</string>
+    <string name="note_create">Создать заметку</string>
+    <string name="note_no_text">Нет текста</string>
+    <string name="note_unknown">Заметка</string>
+    <string name="note_not_found">Заметка не найдена</string>
+    <string name="folders_title">Папки</string>
+    <string name="folders_open">Папки</string>
+    <string name="folders_placeholder">Экран папок появится позже.</string>
+    <string name="editor_mode_handwriting">Рукописный</string>
+    <string name="editor_mode_text">Текст</string>
+    <string name="editor_text_hint">Введите текст…</string>
+    <string name="editor_handwriting_placeholder">Область рукописи — скоро</string>
+    <string name="back">Назад</string>
+</resources>
