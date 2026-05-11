@@ -1,6 +1,7 @@
 package com.example.notesapp.core.repository
 
 import com.example.notesapp.core.model.Folder
+import com.example.notesapp.core.model.InkStroke
 import com.example.notesapp.core.model.Note
 import java.util.UUID
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -38,11 +39,25 @@ class InMemoryNotesRepository : NotesRepository {
         val now = System.currentTimeMillis()
         _notes.update { list ->
             list.map { note ->
-                if (note.id == noteId) {
-                    note.copy(text = text, lastModifiedEpochMs = now)
-                } else {
-                    note
-                }
+                if (note.id == noteId) note.copy(text = text, lastModifiedEpochMs = now) else note
+            }
+        }
+    }
+
+    override fun updateNoteTitle(noteId: String, title: String) {
+        val now = System.currentTimeMillis()
+        _notes.update { list ->
+            list.map { note ->
+                if (note.id == noteId) note.copy(title = title, lastModifiedEpochMs = now) else note
+            }
+        }
+    }
+
+    override fun updateNoteStrokes(noteId: String, strokes: List<InkStroke>) {
+        val now = System.currentTimeMillis()
+        _notes.update { list ->
+            list.map { note ->
+                if (note.id == noteId) note.copy(strokes = strokes, lastModifiedEpochMs = now) else note
             }
         }
     }

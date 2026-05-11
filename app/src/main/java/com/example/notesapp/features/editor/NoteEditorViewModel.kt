@@ -3,6 +3,7 @@ package com.example.notesapp.features.editor
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.notesapp.core.model.InkStroke
 import com.example.notesapp.core.model.Note
 import com.example.notesapp.core.repository.NotesRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -39,6 +40,22 @@ class NoteEditorViewModel(
 
     fun onTextChange(text: String) {
         repository.updateNoteText(noteId, text)
+    }
+
+    fun onStrokeAdded(stroke: InkStroke) {
+        val currentStrokes = repository.getNote(noteId)?.strokes ?: emptyList()
+        repository.updateNoteStrokes(noteId, currentStrokes + stroke)
+    }
+
+    fun onUndoStroke() {
+        val currentStrokes = repository.getNote(noteId)?.strokes ?: emptyList()
+        if (currentStrokes.isNotEmpty()) {
+            repository.updateNoteStrokes(noteId, currentStrokes.dropLast(1))
+        }
+    }
+
+    fun onClearStrokes() {
+        repository.updateNoteStrokes(noteId, emptyList())
     }
 
     companion object {
