@@ -5,7 +5,8 @@ data class Note(
     val title: String,
     val text: String,
     val strokes: List<InkStroke> = emptyList(),
-    val folderId: String,
-    /** Epoch milliseconds; обновляется при создании и изменении текста. */
+    /** null означает «без папки». */
+    val folderId: String?,
+    /** Epoch milliseconds; обновляется при каждом изменении. */
     val lastModifiedEpochMs: Long,
 )

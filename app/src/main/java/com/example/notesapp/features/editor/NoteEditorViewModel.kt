@@ -3,6 +3,7 @@ package com.example.notesapp.features.editor
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.notesapp.core.model.Folder
 import com.example.notesapp.core.model.InkStroke
 import com.example.notesapp.core.model.Note
 import com.example.notesapp.core.repository.NotesRepository
@@ -31,6 +32,13 @@ class NoteEditorViewModel(
             initialValue = repository.getNote(noteId),
         )
 
+    val folders: StateFlow<List<Folder>> = repository.folders
+        .stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = emptyList(),
+        )
+
     private val _editorMode = MutableStateFlow(EditorMode.Text)
     val editorMode: StateFlow<EditorMode> = _editorMode.asStateFlow()
 
@@ -38,8 +46,16 @@ class NoteEditorViewModel(
         _editorMode.value = mode
     }
 
+    fun onTitleChange(title: String) {
+        repository.updateNoteTitle(noteId, title)
+    }
+
     fun onTextChange(text: String) {
         repository.updateNoteText(noteId, text)
+    }
+
+    fun onFolderSelected(folderId: String?) {
+        repository.updateNoteFolder(noteId, folderId)
     }
 
     fun onStrokeAdded(stroke: InkStroke) {

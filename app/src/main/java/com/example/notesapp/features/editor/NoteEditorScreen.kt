@@ -13,10 +13,14 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
@@ -25,12 +29,16 @@ import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.notesapp.R
+import com.example.notesapp.core.model.Folder
 import com.example.notesapp.core.repository.NotesRepository
 import com.example.notesapp.features.editor.components.HandwritingCanvas
 
@@ -46,6 +54,7 @@ fun NoteEditorScreen(
     ),
 ) {
     val note by viewModel.note.collectAsStateWithLifecycle()
+    val folders by viewModel.folders.collectAsStateWithLifecycle()
     val editorMode by viewModel.editorMode.collectAsStateWithLifecycle()
 
     Scaffold(
@@ -70,7 +79,23 @@ fun NoteEditorScreen(
                 .fillMaxSize()
                 .imePadding()
                 .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            OutlinedTextField(
+                value = note?.title ?: "",
+                onValueChange = viewModel::onTitleChange,
+                label = { Text(stringResource(R.string.editor_title_label)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
+            FolderSelector(
+                selectedFolderId = note?.folderId,
+                folders = folders,
+                onFolderSelected = viewModel::onFolderSelected,
+                modifier = Modifier.fillMaxWidth(),
+            )
+
             SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
                 SegmentedButton(
                     shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
@@ -93,9 +118,7 @@ fun NoteEditorScreen(
                     val strokes = note?.strokes ?: emptyList()
 
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(top = 8.dp, bottom = 4.dp),
+                        modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         FilledTonalIconButton(
@@ -104,7 +127,7 @@ fun NoteEditorScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.Undo,
-                                contentDescription = "Undo",
+                                contentDescription = stringResource(R.string.editor_undo),
                             )
                         }
                         FilledTonalIconButton(
@@ -113,7 +136,7 @@ fun NoteEditorScreen(
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Delete,
-                                contentDescription = "Clear",
+                                contentDescription = stringResource(R.string.editor_clear),
                             )
                         }
                     }
@@ -132,14 +155,12 @@ fun NoteEditorScreen(
                     if (current == null) {
                         Text(
                             text = stringResource(R.string.note_not_found),
-                            modifier = Modifier.padding(top = 16.dp),
                         )
                     } else {
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .weight(1f)
-                                .padding(top = 16.dp),
+                                .weight(1f),
                         ) {
                             OutlinedTextField(
                                 value = current.text,
@@ -151,6 +172,57 @@ fun NoteEditorScreen(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FolderSelector(
+    selectedFolderId: String?,
+    folders: List<Folder>,
+    onFolderSelected: (String?) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selectedName = folders.find { it.id == selectedFolderId }?.name
+        ?: stringResource(R.string.folder_none)
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = it },
+        modifier = modifier,
+    ) {
+        OutlinedTextField(
+            value = selectedName,
+            onValueChange = {},
+            readOnly = true,
+            label = { Text(stringResource(R.string.label_folder)) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            modifier = Modifier
+                .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryNotEditable)
+                .fillMaxWidth(),
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+        ) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.folder_none)) },
+                onClick = {
+                    onFolderSelected(null)
+                    expanded = false
+                },
+            )
+            folders.forEach { folder ->
+                DropdownMenuItem(
+                    text = { Text(folder.name) },
+                    onClick = {
+                        onFolderSelected(folder.id)
+                        expanded = false
+                    },
+                )
             }
         }
     }

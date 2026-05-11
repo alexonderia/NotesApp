@@ -32,7 +32,10 @@ fun AppNavHost(
             )
         }
         composable(AppRoutes.Folders) {
-            FoldersScreen(onBack = { navController.popBackStack() })
+            FoldersScreen(
+                repository = repository,
+                onBack = { navController.popBackStack() },
+            )
         }
         composable(
             route = AppRoutes.Editor,

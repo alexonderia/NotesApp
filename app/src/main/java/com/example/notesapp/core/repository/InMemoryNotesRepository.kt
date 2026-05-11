@@ -11,15 +11,13 @@ import kotlinx.coroutines.flow.update
 
 class InMemoryNotesRepository : NotesRepository {
 
-    private val defaultFolderId = "folder-default"
-
-    private val _folders = MutableStateFlow(
-        listOf(Folder(id = defaultFolderId, name = "Общее")),
-    )
+    private val _folders = MutableStateFlow<List<Folder>>(emptyList())
     override val folders: StateFlow<List<Folder>> = _folders.asStateFlow()
 
     private val _notes = MutableStateFlow<List<Note>>(emptyList())
     override val notes: StateFlow<List<Note>> = _notes.asStateFlow()
+
+    // ── Notes ──────────────────────────────────────────────────────────
 
     override fun createNote(): Note {
         val now = System.currentTimeMillis()
@@ -28,12 +26,14 @@ class InMemoryNotesRepository : NotesRepository {
             title = "Новая заметка",
             text = "",
             strokes = emptyList(),
-            folderId = defaultFolderId,
+            folderId = null,
             lastModifiedEpochMs = now,
         )
         _notes.update { it + note }
         return note
     }
+
+    override fun getNote(noteId: String): Note? = _notes.value.find { it.id == noteId }
 
     override fun updateNoteText(noteId: String, text: String) {
         val now = System.currentTimeMillis()
@@ -62,5 +62,37 @@ class InMemoryNotesRepository : NotesRepository {
         }
     }
 
-    override fun getNote(noteId: String): Note? = _notes.value.find { it.id == noteId }
+    override fun updateNoteFolder(noteId: String, folderId: String?) {
+        val now = System.currentTimeMillis()
+        _notes.update { list ->
+            list.map { note ->
+                if (note.id == noteId) note.copy(folderId = folderId, lastModifiedEpochMs = now) else note
+            }
+        }
+    }
+
+    // ── Folders ────────────────────────────────────────────────────────
+
+    override fun createFolder(name: String): Folder {
+        val folder = Folder(id = UUID.randomUUID().toString(), name = name)
+        _folders.update { it + folder }
+        return folder
+    }
+
+    override fun updateFolderName(folderId: String, name: String) {
+        _folders.update { list ->
+            list.map { folder ->
+                if (folder.id == folderId) folder.copy(name = name) else folder
+            }
+        }
+    }
+
+    override fun deleteFolder(folderId: String) {
+        _folders.update { list -> list.filter { it.id != folderId } }
+        _notes.update { list ->
+            list.map { note ->
+                if (note.folderId == folderId) note.copy(folderId = null) else note
+            }
+        }
+    }
 }

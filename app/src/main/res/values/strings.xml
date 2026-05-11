@@ -1,5 +1,7 @@
 <resources>
     <string name="app_name">NotesApp</string>
+
+    <!-- Notes list -->
     <string name="notes_title">Заметки</string>
     <string name="notes_empty_title">Пока нет заметок</string>
     <string name="notes_empty_subtitle">Создайте первую заметку кнопкой «+» внизу справа.</string>
@@ -7,12 +9,37 @@
     <string name="note_no_text">Нет текста</string>
     <string name="note_unknown">Заметка</string>
     <string name="note_not_found">Заметка не найдена</string>
+
+    <!-- Folders screen -->
     <string name="folders_title">Папки</string>
     <string name="folders_open">Папки</string>
     <string name="folders_placeholder">Экран папок появится позже.</string>
+    <string name="folders_empty_title">Нет папок</string>
+    <string name="folders_empty_subtitle">Создайте первую папку кнопкой «+» внизу справа.</string>
+    <string name="folder_create">Создать папку</string>
+    <string name="folder_rename">Переименовать</string>
+    <string name="folder_delete_title">Удалить папку «%1$s»?</string>
+    <string name="folder_delete_message">Заметки из этой папки не будут удалены — они станут «Без папки».</string>
+    <string name="folder_name_hint">Название папки</string>
+    <string name="folder_none">Без папки</string>
+
+    <!-- Filters -->
+    <string name="filter_all">Все</string>
+
+    <!-- Editor -->
     <string name="editor_mode_handwriting">Рукописный</string>
     <string name="editor_mode_text">Текст</string>
     <string name="editor_text_hint">Введите текст…</string>
     <string name="editor_handwriting_placeholder">Область рукописи — скоро</string>
+    <string name="editor_title_label">Название</string>
+    <string name="editor_undo">Отменить штрих</string>
+    <string name="editor_clear">Очистить рукопись</string>
+    <string name="label_folder">Папка</string>
+
+    <!-- Common actions -->
+    <string name="action_create">Создать</string>
+    <string name="action_rename">Переименовать</string>
+    <string name="action_delete">Удалить</string>
+    <string name="action_cancel">Отмена</string>
     <string name="back">Назад</string>
 </resources>
