@@ -12,6 +12,7 @@ import com.example.notesapp.core.repository.NotesRepository
 import com.example.notesapp.features.editor.NoteEditorScreen
 import com.example.notesapp.features.folders.FoldersScreen
 import com.example.notesapp.features.notes.NotesListScreen
+import com.example.notesapp.features.settings.SettingsScreen
 
 @Composable
 fun AppNavHost(
@@ -29,11 +30,17 @@ fun AppNavHost(
                 repository = repository,
                 onOpenNote = { noteId -> navController.navigate(AppRoutes.editorRoute(noteId)) },
                 onOpenFolders = { navController.navigate(AppRoutes.Folders) },
+                onOpenSettings = { navController.navigate(AppRoutes.Settings) },
             )
         }
         composable(AppRoutes.Folders) {
             FoldersScreen(
                 repository = repository,
+                onBack = { navController.popBackStack() },
+            )
+        }
+        composable(AppRoutes.Settings) {
+            SettingsScreen(
                 onBack = { navController.popBackStack() },
             )
         }

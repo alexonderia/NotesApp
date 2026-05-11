@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ElevatedCard
@@ -61,6 +62,7 @@ fun NotesListScreen(
     repository: NotesRepository,
     onOpenNote: (String) -> Unit,
     onOpenFolders: () -> Unit,
+    onOpenSettings: () -> Unit = {},
     viewModel: NotesListViewModel = viewModel(factory = NotesListViewModel.factory(repository)),
 ) {
     val noteCards by viewModel.noteCards.collectAsStateWithLifecycle()
@@ -78,6 +80,12 @@ fun NotesListScreen(
                         Icon(
                             imageVector = Icons.Default.Folder,
                             contentDescription = stringResource(R.string.folders_open),
+                        )
+                    }
+                    IconButton(onClick = onOpenSettings) {
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = stringResource(R.string.settings_title),
                         )
                     }
                 },

@@ -36,10 +36,34 @@
     <string name="editor_clear">Очистить рукопись</string>
     <string name="label_folder">Папка</string>
 
+    <!-- Settings -->
+    <string name="settings_title">Настройки</string>
+    <string name="storage_title">Хранилище заметок</string>
+    <string name="storage_description">Выберите папку, где будут храниться файлы заметок. Папка создаётся на устройстве и остаётся доступной между запусками приложения.</string>
+    <string name="vault_not_selected">Папка не выбрана</string>
+    <string name="vault_selected">Папка выбрана: %1$s</string>
+    <string name="vault_access_lost">Доступ потерян — выберите папку снова</string>
+    <string name="vault_select_folder">Выбрать папку</string>
+    <string name="vault_check_access">Проверить доступ</string>
+    <string name="vault_reset">Сбросить папку</string>
+    <string name="vault_structure_created">Структура папок создана</string>
+    <string name="vault_access_confirmed">Доступ к папке подтверждён</string>
+    <string name="vault_error_selecting">Ошибка при выборе папки</string>
+    <string name="vault_error_access">Доступ к папке потерян</string>
+    <string name="vault_error_structure">Не удалось создать структуру папок</string>
+
     <!-- Common actions -->
     <string name="action_create">Создать</string>
     <string name="action_rename">Переименовать</string>
     <string name="action_delete">Удалить</string>
     <string name="action_cancel">Отмена</string>
     <string name="back">Назад</string>
+
+    <plurals name="folder_note_count">
+        <item quantity="zero">Нет заметок</item>
+        <item quantity="one">%1$d заметка</item>
+        <item quantity="few">%1$d заметки</item>
+        <item quantity="many">%1$d заметок</item>
+        <item quantity="other">%1$d заметок</item>
+    </plurals>
 </resources>

@@ -38,6 +38,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -178,7 +179,11 @@ private fun FolderListItem(
         headlineContent = { Text(folder.name) },
         supportingContent = {
             Text(
-                text = "${folder.noteCount} заметок",
+                text = pluralStringResource(
+                    R.plurals.folder_note_count,
+                    folder.noteCount,
+                    folder.noteCount,
+                ),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
