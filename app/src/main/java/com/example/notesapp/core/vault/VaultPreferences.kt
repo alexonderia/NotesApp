@@ -18,7 +18,7 @@ class VaultPreferences(context: Context) {
     }
 
     companion object {
-        private const val PREFS_NAME = "vault_prefs"
-        private const val KEY_VAULT_URI = "vault_uri"
+        const val PREFS_NAME = "vault_prefs"
+        const val KEY_VAULT_URI = "vault_uri"
     }
 }

@@ -13,10 +13,12 @@ import com.example.notesapp.features.editor.NoteEditorScreen
 import com.example.notesapp.features.folders.FoldersScreen
 import com.example.notesapp.features.notes.NotesListScreen
 import com.example.notesapp.features.settings.SettingsScreen
+import kotlinx.coroutines.flow.StateFlow
 
 @Composable
 fun AppNavHost(
     repository: NotesRepository,
+    isVaultAvailable: StateFlow<Boolean>,
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
 ) {
@@ -28,6 +30,7 @@ fun AppNavHost(
         composable(AppRoutes.Notes) {
             NotesListScreen(
                 repository = repository,
+                isVaultAvailable = isVaultAvailable,
                 onOpenNote = { noteId -> navController.navigate(AppRoutes.editorRoute(noteId)) },
                 onOpenFolders = { navController.navigate(AppRoutes.Folders) },
                 onOpenSettings = { navController.navigate(AppRoutes.Settings) },

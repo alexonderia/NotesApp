@@ -9,4 +9,6 @@ data class Note(
     val folderId: String?,
     /** Epoch milliseconds; обновляется при каждом изменении. */
     val lastModifiedEpochMs: Long,
+    /** Epoch milliseconds; время создания заметки (не меняется). */
+    val createdAt: Long = lastModifiedEpochMs,
 )

@@ -28,6 +28,7 @@ class InMemoryNotesRepository : NotesRepository {
             strokes = emptyList(),
             folderId = null,
             lastModifiedEpochMs = now,
+            createdAt = now,
         )
         _notes.update { it + note }
         return note
@@ -74,15 +75,17 @@ class InMemoryNotesRepository : NotesRepository {
     // ── Folders ────────────────────────────────────────────────────────
 
     override fun createFolder(name: String): Folder {
-        val folder = Folder(id = UUID.randomUUID().toString(), name = name)
+        val now = System.currentTimeMillis()
+        val folder = Folder(id = UUID.randomUUID().toString(), name = name, createdAt = now, updatedAt = now)
         _folders.update { it + folder }
         return folder
     }
 
     override fun updateFolderName(folderId: String, name: String) {
+        val now = System.currentTimeMillis()
         _folders.update { list ->
             list.map { folder ->
-                if (folder.id == folderId) folder.copy(name = name) else folder
+                if (folder.id == folderId) folder.copy(name = name, updatedAt = now) else folder
             }
         }
     }

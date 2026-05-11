@@ -20,8 +20,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Folder
+import androidx.compose.material.icons.filled.FolderOff
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.EditNote
+import androidx.compose.material3.Button
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -50,6 +52,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
+import kotlinx.coroutines.flow.StateFlow
 
 private val WideLayoutMinWidth = 600.dp
 private val ContentMaxWidth = 880.dp
@@ -60,6 +63,7 @@ private val CardPadding = 16.dp
 @Composable
 fun NotesListScreen(
     repository: NotesRepository,
+    isVaultAvailable: StateFlow<Boolean>,
     onOpenNote: (String) -> Unit,
     onOpenFolders: () -> Unit,
     onOpenSettings: () -> Unit = {},
@@ -68,6 +72,7 @@ fun NotesListScreen(
     val noteCards by viewModel.noteCards.collectAsStateWithLifecycle()
     val folders by viewModel.folders.collectAsStateWithLifecycle()
     val selectedFilter by viewModel.selectedFilter.collectAsStateWithLifecycle()
+    val vaultAvailable by isVaultAvailable.collectAsStateWithLifecycle()
     val dateFormatter = rememberNoteDateFormatter()
 
     Scaffold(
@@ -92,16 +97,18 @@ fun NotesListScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = {
-                    val id = viewModel.createNote()
-                    onOpenNote(id)
-                },
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = stringResource(R.string.note_create),
-                )
+            if (vaultAvailable) {
+                FloatingActionButton(
+                    onClick = {
+                        val id = viewModel.createNote()
+                        onOpenNote(id)
+                    },
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = stringResource(R.string.note_create),
+                    )
+                }
             }
         },
     ) { innerPadding ->
@@ -110,6 +117,16 @@ fun NotesListScreen(
                 .fillMaxSize()
                 .padding(innerPadding),
         ) {
+            if (!vaultAvailable) {
+                NoVaultEmptyState(
+                    onOpenSettings = onOpenSettings,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(32.dp),
+                )
+                return@Column
+            }
+
             FolderFilterRow(
                 folders = folders,
                 selected = selectedFilter,
@@ -319,5 +336,41 @@ private fun NotesListEmptyState(modifier: Modifier = Modifier) {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
+    }
+}
+
+@Composable
+private fun NoVaultEmptyState(
+    onOpenSettings: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Icon(
+            imageVector = Icons.Default.FolderOff,
+            contentDescription = null,
+            modifier = Modifier.size(80.dp),
+            tint = MaterialTheme.colorScheme.secondary,
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+        Text(
+            text = stringResource(R.string.vault_no_folder_title),
+            style = MaterialTheme.typography.headlineSmall,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = stringResource(R.string.vault_no_folder_subtitle),
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(modifier = Modifier.height(24.dp))
+        Button(onClick = onOpenSettings) {
+            Text(stringResource(R.string.vault_open_settings))
+        }
     }
 }

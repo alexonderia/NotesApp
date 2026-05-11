@@ -52,6 +52,11 @@
     <string name="vault_error_access">Доступ к папке потерян</string>
     <string name="vault_error_structure">Не удалось создать структуру папок</string>
 
+    <!-- Vault not selected state -->
+    <string name="vault_no_folder_title">Папка для заметок не выбрана</string>
+    <string name="vault_no_folder_subtitle">Выберите папку, чтобы сохранять заметки как файлы на устройстве</string>
+    <string name="vault_open_settings">Открыть настройки хранилища</string>
+
     <!-- Common actions -->
     <string name="action_create">Создать</string>
     <string name="action_rename">Переименовать</string>

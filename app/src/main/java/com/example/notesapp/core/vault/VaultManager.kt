@@ -48,6 +48,16 @@ class VaultManager(private val context: Context) {
         }
     }
 
+    fun getVaultUri(): android.net.Uri? {
+        val uriString = preferences.getVaultUri() ?: return null
+        return android.net.Uri.parse(uriString)
+    }
+
+    fun getVaultRoot(): DocumentFile? {
+        val uri = getVaultUri() ?: return null
+        return if (hasAccess(uri)) DocumentFile.fromTreeUri(context, uri) else null
+    }
+
     fun clearVault() {
         preferences.clearVaultUri()
     }
