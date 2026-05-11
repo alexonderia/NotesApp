@@ -8,6 +8,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.notesapp.core.recognition.HandwritingRecognitionService
 import com.example.notesapp.core.repository.NotesRepository
 import com.example.notesapp.features.editor.NoteEditorScreen
 import com.example.notesapp.features.folders.FoldersScreen
@@ -19,6 +20,7 @@ import kotlinx.coroutines.flow.StateFlow
 fun AppNavHost(
     repository: NotesRepository,
     isVaultAvailable: StateFlow<Boolean>,
+    recognitionService: HandwritingRecognitionService,
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
 ) {
@@ -57,6 +59,7 @@ fun AppNavHost(
             NoteEditorScreen(
                 repository = repository,
                 noteId = noteId,
+                recognitionService = recognitionService,
                 onBack = { navController.popBackStack() },
             )
         }

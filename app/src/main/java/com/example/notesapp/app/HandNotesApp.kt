@@ -2,6 +2,7 @@ package com.example.notesapp.app
 
 import androidx.compose.runtime.Composable
 import com.example.notesapp.app.navigation.AppNavHost
+import com.example.notesapp.core.recognition.HandwritingRecognitionService
 import com.example.notesapp.core.repository.NotesRepository
 import com.example.notesapp.core.ui.AppTheme
 import kotlinx.coroutines.flow.StateFlow
@@ -10,11 +11,13 @@ import kotlinx.coroutines.flow.StateFlow
 fun HandNotesApp(
     repository: NotesRepository,
     isVaultAvailable: StateFlow<Boolean>,
+    recognitionService: HandwritingRecognitionService,
 ) {
     AppTheme {
         AppNavHost(
             repository = repository,
             isVaultAvailable = isVaultAvailable,
+            recognitionService = recognitionService,
         )
     }
 }

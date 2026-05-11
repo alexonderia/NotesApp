@@ -5,6 +5,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.example.notesapp.app.HandNotesApp
+import com.example.notesapp.core.recognition.MlKitHandwritingRecognitionService
 import com.example.notesapp.core.repository.SafFileNotesRepository
 import com.example.notesapp.core.vault.VaultManager
 
@@ -16,6 +17,10 @@ class MainActivity : ComponentActivity() {
         SafFileNotesRepository(applicationContext, vaultManager)
     }
 
+    private val recognitionService by lazy {
+        MlKitHandwritingRecognitionService()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -23,6 +28,7 @@ class MainActivity : ComponentActivity() {
             HandNotesApp(
                 repository = notesRepository,
                 isVaultAvailable = notesRepository.isVaultAvailable,
+                recognitionService = recognitionService,
             )
         }
     }

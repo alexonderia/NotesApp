@@ -57,6 +57,16 @@
     <string name="vault_no_folder_subtitle">Выберите папку, чтобы сохранять заметки как файлы на устройстве</string>
     <string name="vault_open_settings">Открыть настройки хранилища</string>
 
+    <!-- Handwriting recognition -->
+    <string name="recognition_action">Распознать</string>
+    <string name="recognition_downloading_model">Скачивается модель русского языка…</string>
+    <string name="recognition_recognizing">Распознаём рукописный текст…</string>
+    <string name="recognition_success">Текст распознан</string>
+    <string name="recognition_error">Не удалось распознать текст</string>
+    <string name="recognition_no_strokes">Нет рукописного текста для распознавания</string>
+    <string name="recognition_russian_model_error">Ошибка загрузки модели русского языка</string>
+    <string name="recognition_append_separator">\n\n</string>
+
     <!-- Common actions -->
     <string name="action_create">Создать</string>
     <string name="action_rename">Переименовать</string>
