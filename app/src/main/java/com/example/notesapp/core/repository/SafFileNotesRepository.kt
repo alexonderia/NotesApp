@@ -5,6 +5,7 @@ import android.content.SharedPreferences
 import android.util.Log
 import androidx.documentfile.provider.DocumentFile
 import com.example.notesapp.core.model.Folder
+import com.example.notesapp.core.model.HandwritingBlock
 import com.example.notesapp.core.model.InkStroke
 import com.example.notesapp.core.model.Note
 import com.example.notesapp.core.vault.VaultManager
@@ -166,19 +167,22 @@ class SafFileNotesRepository(
             Log.w(TAG, "Could not parse front matter: ${file.name}")
             return null
         }
-        val strokes = if (inkDirectory != null) {
+        val inkData = if (inkDirectory != null) {
             val inkFile = SafDocumentTree.findFile(inkDirectory, VaultFileNames.inkFileName(data.id))
             if (inkFile != null) {
                 val inkContent = SafDocumentTree.readText(context, inkFile.uri) ?: ""
-                InkJsonParser.parse(inkContent)
-            } else emptyList()
-        } else emptyList()
+                InkJsonParser.parseInk(inkContent)
+            } else InkJsonParser.InkFileData(emptyList(), emptyList())
+        } else InkJsonParser.InkFileData(emptyList(), emptyList())
 
         Note(
             id = data.id,
             title = data.title,
-            text = data.body,
-            strokes = strokes,
+            recognizedText = data.recognizedText,
+            recognizedStrokeIds = data.recognizedStrokeIds,
+            manualText = data.manualText,
+            strokes = inkData.strokes,
+            handwritingBlocks = inkData.handwritingBlocks,
             folderId = data.folderId ?: folderId,
             lastModifiedEpochMs = data.updatedAt,
             createdAt = data.createdAt,
@@ -196,7 +200,8 @@ class SafFileNotesRepository(
         val note = Note(
             id = noteId,
             title = "Новая заметка",
-            text = "",
+            recognizedText = "",
+            manualText = "",
             strokes = emptyList(),
             folderId = null,
             lastModifiedEpochMs = now,
@@ -214,7 +219,10 @@ class SafFileNotesRepository(
                     id_, VaultFileNames.inkFileName(noteId), VaultFileNames.INK_MIME
                 )
                 if (inkFile != null) {
-                    SafDocumentTree.writeText(context, inkFile.uri, InkJsonParser.serialize(noteId, emptyList()))
+                    SafDocumentTree.writeText(
+                        context, inkFile.uri,
+                        InkJsonParser.serialize(noteId, emptyList(), emptyList()),
+                    )
                 }
             }
         }
@@ -223,10 +231,61 @@ class SafFileNotesRepository(
 
     override fun getNote(noteId: String): Note? = _notes.value.find { it.id == noteId }
 
-    override fun updateNoteText(noteId: String, text: String) {
+    override fun updateRecognizedContent(
+        noteId: String,
+        recognizedText: String,
+        recognizedStrokeIds: Set<String>,
+        handwritingBlocks: List<HandwritingBlock>?,
+    ) {
         val now = System.currentTimeMillis()
         _notes.update { list ->
-            list.map { if (it.id == noteId) it.copy(text = text, lastModifiedEpochMs = now) else it }
+            list.map { note ->
+                if (note.id == noteId) {
+                    val blocks = handwritingBlocks ?: note.handwritingBlocks
+                    note.copy(
+                        recognizedText = recognizedText,
+                        recognizedStrokeIds = recognizedStrokeIds,
+                        handwritingBlocks = blocks,
+                        lastModifiedEpochMs = now,
+                    )
+                } else {
+                    note
+                }
+            }
+        }
+        scope.launch {
+            persistInk(noteId)
+            persistNote(noteId)
+        }
+    }
+
+    override fun clearHandwriting(noteId: String) {
+        val now = System.currentTimeMillis()
+        _notes.update { list ->
+            list.map {
+                if (it.id == noteId) {
+                    it.copy(
+                        strokes = emptyList(),
+                        recognizedText = "",
+                        recognizedStrokeIds = emptySet(),
+                        handwritingBlocks = emptyList(),
+                        lastModifiedEpochMs = now,
+                    )
+                } else {
+                    it
+                }
+            }
+        }
+        scope.launch {
+            persistInk(noteId)
+            persistNote(noteId)
+        }
+    }
+
+    override fun updateManualText(noteId: String, text: String) {
+        val now = System.currentTimeMillis()
+        _notes.update { list ->
+            list.map { if (it.id == noteId) it.copy(manualText = text, lastModifiedEpochMs = now) else it }
         }
         scope.launch { persistNote(noteId) }
     }
@@ -245,12 +304,7 @@ class SafFileNotesRepository(
             list.map { if (it.id == noteId) it.copy(strokes = strokes, lastModifiedEpochMs = now) else it }
         }
         scope.launch {
-            val root = vaultRoot() ?: return@launch
-            val id_ = inkDir(root) ?: return@launch
-            val inkFile = SafDocumentTree.getOrCreateFile(
-                id_, VaultFileNames.inkFileName(noteId), VaultFileNames.INK_MIME
-            ) ?: return@launch
-            SafDocumentTree.writeText(context, inkFile.uri, InkJsonParser.serialize(noteId, strokes))
+            persistInk(noteId)
             persistNote(noteId)
         }
     }
@@ -337,7 +391,9 @@ class SafFileNotesRepository(
                             id = note.id, title = note.title,
                             createdAt = note.createdAt, updatedAt = now,
                             folderId = folderId, folderName = trimmed,
-                            body = note.text,
+                            recognizedText = note.recognizedText,
+                            manualText = note.manualText,
+                            recognizedStrokeIds = note.recognizedStrokeIds,
                         )
                     )
                 }
@@ -372,7 +428,9 @@ class SafFileNotesRepository(
                                 id = parsed.id, title = parsed.title,
                                 createdAt = parsed.createdAt, updatedAt = now,
                                 folderId = null, folderName = null,
-                                body = parsed.body,
+                                recognizedText = parsed.recognizedText,
+                                manualText = parsed.manualText,
+                                recognizedStrokeIds = parsed.recognizedStrokeIds,
                             )
                         } else rawContent
                         val dest = SafDocumentTree.getOrCreateFile(nd, noteFile.name!!, VaultFileNames.NOTE_MIME)
@@ -389,6 +447,19 @@ class SafFileNotesRepository(
     }
 
     // ── Private file I/O helpers ──────────────────────────────────────────────
+
+    private fun persistInk(noteId: String) {
+        val root = vaultRoot() ?: return
+        val note = _notes.value.find { it.id == noteId } ?: return
+        val id_ = inkDir(root) ?: return
+        val inkFile = SafDocumentTree.getOrCreateFile(
+            id_, VaultFileNames.inkFileName(noteId), VaultFileNames.INK_MIME
+        ) ?: return
+        SafDocumentTree.writeText(
+            context, inkFile.uri,
+            InkJsonParser.serialize(noteId, note.strokes, note.handwritingBlocks),
+        )
+    }
 
     /** Writes (or overwrites) the note's .md file at its current folder location. */
     private fun persistNote(noteId: String) {
@@ -411,7 +482,9 @@ class SafFileNotesRepository(
             updatedAt = note.lastModifiedEpochMs,
             folderId = note.folderId,
             folderName = folderName,
-            body = note.text,
+            recognizedText = note.recognizedText,
+            manualText = note.manualText,
+            recognizedStrokeIds = note.recognizedStrokeIds,
         )
         SafDocumentTree.writeText(context, file.uri, content)
     }
@@ -437,7 +510,9 @@ class SafFileNotesRepository(
             id = note.id, title = note.title,
             createdAt = note.createdAt, updatedAt = note.lastModifiedEpochMs,
             folderId = newFolderId, folderName = newFolderName,
-            body = note.text,
+            recognizedText = note.recognizedText,
+            manualText = note.manualText,
+            recognizedStrokeIds = note.recognizedStrokeIds,
         )
         val targetFile = SafDocumentTree.getOrCreateFile(targetDir, fileName, VaultFileNames.NOTE_MIME) ?: return
         SafDocumentTree.writeText(context, targetFile.uri, content)

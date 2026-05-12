@@ -29,11 +29,17 @@
     <!-- Editor -->
     <string name="editor_mode_handwriting">Рукописный</string>
     <string name="editor_mode_text">Текст</string>
-    <string name="editor_text_hint">Введите текст…</string>
+    <string name="editor_recognized_label">Распознанный текст</string>
+    <string name="editor_manual_label">Дополнения</string>
+    <string name="editor_recognized_empty_hint">Распознайте рукописный текст</string>
+    <string name="editor_manual_hint">Дополнения к распознанному тексту…</string>
     <string name="editor_handwriting_placeholder">Область рукописи — скоро</string>
     <string name="editor_title_label">Название</string>
     <string name="editor_undo">Отменить штрих</string>
+    <string name="editor_redo">Вернуть штрих</string>
     <string name="editor_clear">Очистить рукопись</string>
+    <string name="editor_tool_pen">Ручка</string>
+    <string name="editor_tool_eraser">Ластик</string>
     <string name="label_folder">Папка</string>
 
     <!-- Settings -->
@@ -58,7 +64,12 @@
     <string name="vault_open_settings">Открыть настройки хранилища</string>
 
     <!-- Handwriting recognition -->
-    <string name="recognition_action">Распознать</string>
+    <string name="recognition_action_new">Распознать новое</string>
+    <string name="recognition_action_rerun_all">Перераспознать всё</string>
+    <string name="recognition_action_by_lines">Распознать по строкам</string>
+    <string name="recognition_blocks_status">Блоков: %1$d</string>
+    <string name="recognition_no_new_strokes">Нет новых рукописных фрагментов</string>
+    <string name="recognition_strokes_status">Распознано штрихов: %1$d из %2$d</string>
     <string name="recognition_downloading_model">Скачивается модель русского языка…</string>
     <string name="recognition_recognizing">Распознаём рукописный текст…</string>
     <string name="recognition_success">Текст распознан</string>

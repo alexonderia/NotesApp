@@ -1,8 +1,11 @@
 package com.example.notesapp.core.vault.file
 
 import android.util.Log
+import com.example.notesapp.core.model.HandwritingBlock
 import com.example.notesapp.core.model.InkStroke
+import com.example.notesapp.core.model.StrokeBounds
 import com.example.notesapp.core.model.StrokePoint
+import com.example.notesapp.core.model.ToolType
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
@@ -12,9 +15,48 @@ object InkJsonParser {
 
     private const val TAG = "InkJsonParser"
 
-    fun parse(json: String): List<InkStroke> = try {
+    data class InkFileData(
+        val strokes: List<InkStroke>,
+        val handwritingBlocks: List<HandwritingBlock>,
+    )
+
+    fun parseInk(json: String): InkFileData = try {
         val obj = JSONObject(json)
-        val strokesArr = obj.optJSONArray("strokes") ?: return emptyList()
+        val strokesArr = obj.optJSONArray("strokes") ?: JSONArray()
+        val strokes = parseStrokesArray(strokesArr)
+        val blocksArr = obj.optJSONArray("handwritingBlocks")
+        val blocks = if (blocksArr != null) parseBlocksArray(blocksArr) else emptyList()
+        InkFileData(strokes = strokes, handwritingBlocks = blocks)
+    } catch (e: Exception) {
+        Log.w(TAG, "parseInk failed: ${e.message}")
+        InkFileData(emptyList(), emptyList())
+    }
+
+    /** Обратная совместимость: только штрихи. */
+    fun parse(json: String): List<InkStroke> = parseInk(json).strokes
+
+    fun serialize(
+        noteId: String,
+        strokes: List<InkStroke>,
+        handwritingBlocks: List<HandwritingBlock> = emptyList(),
+    ): String {
+        val obj = JSONObject()
+        obj.put("noteId", noteId)
+        obj.put("version", 2)
+        val strokesArr = JSONArray()
+        for (stroke in strokes) {
+            strokesArr.put(strokeToJson(stroke))
+        }
+        obj.put("strokes", strokesArr)
+        val blocksArr = JSONArray()
+        for (block in handwritingBlocks) {
+            blocksArr.put(blockToJson(block))
+        }
+        obj.put("handwritingBlocks", blocksArr)
+        return obj.toString(2)
+    }
+
+    private fun parseStrokesArray(strokesArr: JSONArray): List<InkStroke> =
         (0 until strokesArr.length()).map { i ->
             val s = strokesArr.getJSONObject(i)
             val pointsArr = s.optJSONArray("points") ?: JSONArray()
@@ -33,37 +75,80 @@ object InkJsonParser {
                 width = s.optDouble("width", 4.0).toFloat(),
                 timestamp = s.optLong("timestamp", System.currentTimeMillis()),
                 points = points,
+                toolType = parseToolType(s.optString("toolType")),
             )
         }
-    } catch (e: Exception) {
-        Log.w(TAG, "parse failed: ${e.message}")
-        emptyList()
+
+    private fun parseToolType(raw: String): ToolType =
+        when (raw.lowercase()) {
+            "eraser" -> ToolType.Eraser
+            else -> ToolType.Pen
+        }
+
+    private fun parseBlocksArray(blocksArr: JSONArray): List<HandwritingBlock> =
+        (0 until blocksArr.length()).mapNotNull { i ->
+            try {
+                val b = blocksArr.getJSONObject(i)
+                val idsArr = b.optJSONArray("strokeIds") ?: JSONArray()
+                val strokeIds = (0 until idsArr.length()).map { idx -> idsArr.getString(idx) }
+                val boundsObj = b.getJSONObject("bounds")
+                val bounds = StrokeBounds(
+                    minX = boundsObj.getDouble("minX").toFloat(),
+                    minY = boundsObj.getDouble("minY").toFloat(),
+                    maxX = boundsObj.getDouble("maxX").toFloat(),
+                    maxY = boundsObj.getDouble("maxY").toFloat(),
+                )
+                HandwritingBlock(
+                    id = b.optString("id").ifEmpty { UUID.randomUUID().toString() },
+                    strokeIds = strokeIds,
+                    bounds = bounds,
+                    recognizedText = b.optString("recognizedText", ""),
+                    orderIndex = b.optInt("orderIndex", 0),
+                    updatedAt = b.optLong("updatedAt", System.currentTimeMillis()),
+                )
+            } catch (e: Exception) {
+                Log.w(TAG, "parse block failed: ${e.message}")
+                null
+            }
+        }
+
+    private fun strokeToJson(stroke: InkStroke): JSONObject {
+        val s = JSONObject()
+        s.put("id", stroke.id)
+        s.put("color", stroke.color)
+        s.put("width", stroke.width.toDouble())
+        s.put("timestamp", stroke.timestamp)
+        s.put("toolType", stroke.toolType.name.lowercase())
+        val pointsArr = JSONArray()
+        for (point in stroke.points) {
+            val p = JSONObject()
+            p.put("x", point.x.toDouble())
+            p.put("y", point.y.toDouble())
+            p.put("pressure", point.pressure.toDouble())
+            p.put("timestamp", point.timestamp)
+            pointsArr.put(p)
+        }
+        s.put("points", pointsArr)
+        return s
     }
 
-    fun serialize(noteId: String, strokes: List<InkStroke>): String {
-        val obj = JSONObject()
-        obj.put("noteId", noteId)
-        obj.put("version", 1)
-        val strokesArr = JSONArray()
-        for (stroke in strokes) {
-            val s = JSONObject()
-            s.put("id", stroke.id)
-            s.put("color", stroke.color)
-            s.put("width", stroke.width.toDouble())
-            s.put("timestamp", stroke.timestamp)
-            val pointsArr = JSONArray()
-            for (point in stroke.points) {
-                val p = JSONObject()
-                p.put("x", point.x.toDouble())
-                p.put("y", point.y.toDouble())
-                p.put("pressure", point.pressure.toDouble())
-                p.put("timestamp", point.timestamp)
-                pointsArr.put(p)
-            }
-            s.put("points", pointsArr)
-            strokesArr.put(s)
+    private fun blockToJson(block: HandwritingBlock): JSONObject {
+        val b = JSONObject()
+        b.put("id", block.id)
+        val idsArr = JSONArray()
+        for (id in block.strokeIds) {
+            idsArr.put(id)
         }
-        obj.put("strokes", strokesArr)
-        return obj.toString(2)
+        b.put("strokeIds", idsArr)
+        val bo = JSONObject()
+        bo.put("minX", block.bounds.minX.toDouble())
+        bo.put("minY", block.bounds.minY.toDouble())
+        bo.put("maxX", block.bounds.maxX.toDouble())
+        bo.put("maxY", block.bounds.maxY.toDouble())
+        b.put("bounds", bo)
+        b.put("recognizedText", block.recognizedText)
+        b.put("orderIndex", block.orderIndex)
+        b.put("updatedAt", block.updatedAt)
+        return b
     }
 }

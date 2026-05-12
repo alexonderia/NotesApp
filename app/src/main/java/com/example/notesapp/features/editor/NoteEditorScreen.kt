@@ -1,5 +1,9 @@
 package com.example.notesapp.features.editor
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,14 +13,21 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.outlined.RemoveCircleOutline
 import androidx.compose.material3.Button
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -25,6 +36,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SegmentedButton
@@ -41,12 +53,17 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.notesapp.R
 import com.example.notesapp.core.model.Folder
+import com.example.notesapp.core.model.Note
+import com.example.notesapp.core.model.ToolType
+import com.example.notesapp.core.model.penStrokesOnly
 import com.example.notesapp.core.recognition.HandwritingRecognitionService
 import com.example.notesapp.core.recognition.RecognitionState
 import com.example.notesapp.core.repository.NotesRepository
@@ -72,6 +89,7 @@ fun NoteEditorScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val successMessage = stringResource(R.string.recognition_success)
     val noStrokesMessage = stringResource(R.string.recognition_no_strokes)
+    val noNewStrokesMessage = stringResource(R.string.recognition_no_new_strokes)
 
     LaunchedEffect(recognitionState) {
         when (val state = recognitionState) {
@@ -80,7 +98,11 @@ fun NoteEditorScreen(
                 viewModel.dismissRecognitionState()
             }
             is RecognitionState.Error -> {
-                val msg = if (state.message == "no_strokes") noStrokesMessage else state.message
+                val msg = when (state.message) {
+                    "no_strokes" -> noStrokesMessage
+                    "no_new_strokes" -> noNewStrokesMessage
+                    else -> state.message
+                }
                 snackbarHostState.showSnackbar(msg)
                 viewModel.dismissRecognitionState()
             }
@@ -148,38 +170,81 @@ fun NoteEditorScreen(
             when (editorMode) {
                 EditorMode.Handwriting -> {
                     val strokes = note?.strokes ?: emptyList()
+                    val penStrokes = strokes.penStrokesOnly()
+                    val recognizedIds = note?.recognizedStrokeIds ?: emptySet()
+                    val hasNewStrokes = penStrokes.any { it.id !in recognizedIds }
+                    val recognizedOnCanvas = penStrokes.count { it.id in recognizedIds }
                     val isBusy = recognitionState == RecognitionState.Recognizing ||
                         recognitionState == RecognitionState.DownloadingModel
+
+                    val selectedTool by viewModel.selectedTool.collectAsStateWithLifecycle()
+                    val selectedColor by viewModel.selectedColor.collectAsStateWithLifecycle()
+                    val selectedWidth by viewModel.selectedWidth.collectAsStateWithLifecycle()
+                    val redoStack by viewModel.redoStack.collectAsStateWithLifecycle()
+
+                    HandwritingToolbar(
+                        selectedTool = selectedTool,
+                        onToolChange = viewModel::setSelectedTool,
+                        selectedWidth = selectedWidth,
+                        onWidthChange = viewModel::setSelectedWidth,
+                        selectedColor = selectedColor,
+                        onColorChange = viewModel::setSelectedColor,
+                        canUndo = strokes.isNotEmpty(),
+                        canRedo = redoStack.isNotEmpty(),
+                        onUndo = viewModel::onUndoStroke,
+                        onRedo = viewModel::onRedoStroke,
+                        onClear = viewModel::onClearStrokes,
+                        canClear = strokes.isNotEmpty(),
+                        enabled = !isBusy,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        FilledTonalIconButton(
-                            onClick = viewModel::onUndoStroke,
-                            enabled = strokes.isNotEmpty() && !isBusy,
-                        ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.Undo,
-                                contentDescription = stringResource(R.string.editor_undo),
-                            )
-                        }
-                        FilledTonalIconButton(
-                            onClick = viewModel::onClearStrokes,
-                            enabled = strokes.isNotEmpty() && !isBusy,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.Delete,
-                                contentDescription = stringResource(R.string.editor_clear),
-                            )
-                        }
                         Button(
-                            onClick = viewModel::recognizeCurrentHandwriting,
-                            enabled = strokes.isNotEmpty() && !isBusy,
+                            onClick = viewModel::recognizeNewHandwriting,
+                            enabled = hasNewStrokes && !isBusy,
+                            modifier = Modifier.weight(1f),
                         ) {
-                            Text(stringResource(R.string.recognition_action))
+                            Text(stringResource(R.string.recognition_action_new))
                         }
+                        OutlinedButton(
+                            onClick = viewModel::recognizeAllHandwriting,
+                            enabled = penStrokes.isNotEmpty() && !isBusy,
+                            modifier = Modifier.weight(1f),
+                        ) {
+                            Text(stringResource(R.string.recognition_action_rerun_all))
+                        }
+                    }
+
+                    Text(
+                        text = stringResource(
+                            R.string.recognition_strokes_status,
+                            recognizedOnCanvas,
+                            penStrokes.size,
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+
+                    Text(
+                        text = stringResource(
+                            R.string.recognition_blocks_status,
+                            note?.handwritingBlocks?.size ?: 0,
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+
+                    OutlinedButton(
+                        onClick = viewModel::recognizeBlocks,
+                        enabled = penStrokes.isNotEmpty() && !isBusy,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text(stringResource(R.string.recognition_action_by_lines))
                     }
 
                     if (isBusy) {
@@ -206,7 +271,12 @@ fun NoteEditorScreen(
 
                     HandwritingCanvas(
                         strokes = strokes,
-                        onStrokeFinished = viewModel::onStrokeAdded,
+                        selectedTool = selectedTool,
+                        penColor = selectedColor,
+                        penWidth = selectedWidth,
+                        eraserRadius = 40f,
+                        onPenStrokeFinished = viewModel::onStrokeAdded,
+                        onStrokesReplace = viewModel::onStrokesReplaceAfterErase,
                         modifier = Modifier
                             .fillMaxSize()
                             .weight(1f),
@@ -218,21 +288,148 @@ fun NoteEditorScreen(
                     if (current == null) {
                         Text(text = stringResource(R.string.note_not_found))
                     } else {
-                        Box(
+                        val scroll = rememberScrollState()
+                        Column(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .weight(1f),
+                                .weight(1f)
+                                .verticalScroll(scroll),
+                            verticalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
                             OutlinedTextField(
-                                value = current.text,
-                                onValueChange = viewModel::onTextChange,
-                                modifier = Modifier.fillMaxSize(),
-                                placeholder = { Text(stringResource(R.string.editor_text_hint)) },
+                                value = current.recognizedText,
+                                onValueChange = {},
+                                readOnly = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                label = { Text(stringResource(R.string.editor_recognized_label)) },
+                                placeholder = {
+                                    Text(stringResource(R.string.editor_recognized_empty_hint))
+                                },
+                                minLines = 4,
+                            )
+                            OutlinedTextField(
+                                value = current.manualText,
+                                onValueChange = viewModel::onManualTextChange,
+                                modifier = Modifier.fillMaxWidth(),
+                                label = { Text(stringResource(R.string.editor_manual_label)) },
+                                placeholder = { Text(stringResource(R.string.editor_manual_hint)) },
                                 minLines = 4,
                             )
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HandwritingToolbar(
+    selectedTool: ToolType,
+    onToolChange: (ToolType) -> Unit,
+    selectedWidth: Float,
+    onWidthChange: (Float) -> Unit,
+    selectedColor: Long,
+    onColorChange: (Long) -> Unit,
+    canUndo: Boolean,
+    canRedo: Boolean,
+    canClear: Boolean,
+    onUndo: () -> Unit,
+    onRedo: () -> Unit,
+    onClear: () -> Unit,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    val widths = listOf(2f, 4f, 8f, 12f)
+    val palette = listOf(
+        0xFF000000L,
+        0xFF1976D2L,
+        0xFFD32F2FL,
+        0xFF388E3CL,
+    )
+    val scroll = rememberScrollState()
+
+    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.horizontalScroll(scroll),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            FilterChip(
+                selected = selectedTool == ToolType.Pen,
+                onClick = { onToolChange(ToolType.Pen) },
+                label = { Text(stringResource(R.string.editor_tool_pen)) },
+                leadingIcon = {
+                    Icon(
+                        Icons.Filled.Edit,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                },
+                enabled = enabled,
+            )
+            FilterChip(
+                selected = selectedTool == ToolType.Eraser,
+                onClick = { onToolChange(ToolType.Eraser) },
+                label = { Text(stringResource(R.string.editor_tool_eraser)) },
+                leadingIcon = {
+                    Icon(
+                        Icons.Outlined.RemoveCircleOutline,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp),
+                    )
+                },
+                enabled = enabled,
+            )
+
+            FilledTonalIconButton(onClick = onUndo, enabled = canUndo && enabled) {
+                Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = stringResource(R.string.editor_undo))
+            }
+            FilledTonalIconButton(onClick = onRedo, enabled = canRedo && enabled) {
+                Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = stringResource(R.string.editor_redo))
+            }
+            FilledTonalIconButton(onClick = onClear, enabled = canClear && enabled) {
+                Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.editor_clear))
+            }
+        }
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            widths.forEach { w ->
+                FilterChip(
+                    selected = kotlin.math.abs(selectedWidth - w) < 0.5f,
+                    onClick = { onWidthChange(w) },
+                    label = { Text("${w.toInt()}") },
+                    enabled = enabled,
+                )
+            }
+        }
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            palette.forEach { c ->
+                val selected = selectedColor == c
+                Box(
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Color(c))
+                        .border(
+                            width = if (selected) 3.dp else 1.dp,
+                            color = if (selected) {
+                                MaterialTheme.colorScheme.primary
+                            } else {
+                                MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+                            },
+                            shape = CircleShape,
+                        )
+                        .clickable(enabled = enabled) { onColorChange(c) },
+                )
             }
         }
     }

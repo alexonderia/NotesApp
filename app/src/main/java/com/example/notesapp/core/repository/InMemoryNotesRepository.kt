@@ -1,6 +1,7 @@
 package com.example.notesapp.core.repository
 
 import com.example.notesapp.core.model.Folder
+import com.example.notesapp.core.model.HandwritingBlock
 import com.example.notesapp.core.model.InkStroke
 import com.example.notesapp.core.model.Note
 import java.util.UUID
@@ -24,7 +25,8 @@ class InMemoryNotesRepository : NotesRepository {
         val note = Note(
             id = UUID.randomUUID().toString(),
             title = "Новая заметка",
-            text = "",
+            recognizedText = "",
+            manualText = "",
             strokes = emptyList(),
             folderId = null,
             lastModifiedEpochMs = now,
@@ -36,11 +38,54 @@ class InMemoryNotesRepository : NotesRepository {
 
     override fun getNote(noteId: String): Note? = _notes.value.find { it.id == noteId }
 
-    override fun updateNoteText(noteId: String, text: String) {
+    override fun updateRecognizedContent(
+        noteId: String,
+        recognizedText: String,
+        recognizedStrokeIds: Set<String>,
+        handwritingBlocks: List<HandwritingBlock>?,
+    ) {
         val now = System.currentTimeMillis()
         _notes.update { list ->
             list.map { note ->
-                if (note.id == noteId) note.copy(text = text, lastModifiedEpochMs = now) else note
+                if (note.id == noteId) {
+                    val blocks = handwritingBlocks ?: note.handwritingBlocks
+                    note.copy(
+                        recognizedText = recognizedText,
+                        recognizedStrokeIds = recognizedStrokeIds,
+                        handwritingBlocks = blocks,
+                        lastModifiedEpochMs = now,
+                    )
+                } else {
+                    note
+                }
+            }
+        }
+    }
+
+    override fun clearHandwriting(noteId: String) {
+        val now = System.currentTimeMillis()
+        _notes.update { list ->
+            list.map { note ->
+                if (note.id == noteId) {
+                    note.copy(
+                        strokes = emptyList(),
+                        recognizedText = "",
+                        recognizedStrokeIds = emptySet(),
+                        handwritingBlocks = emptyList(),
+                        lastModifiedEpochMs = now,
+                    )
+                } else {
+                    note
+                }
+            }
+        }
+    }
+
+    override fun updateManualText(noteId: String, text: String) {
+        val now = System.currentTimeMillis()
+        _notes.update { list ->
+            list.map { note ->
+                if (note.id == noteId) note.copy(manualText = text, lastModifiedEpochMs = now) else note
             }
         }
     }
