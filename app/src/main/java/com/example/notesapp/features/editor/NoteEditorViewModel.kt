@@ -89,15 +89,14 @@ class NoteEditorViewModel(
 
             _recognitionState.value = RecognitionState.Recognizing
             val currentNote = note.value ?: return
-            val preContext = currentNote.text.takeLast(20)
 
             val result = recognitionService.recognizeRussian(
                 strokes = strokes,
-                preContext = preContext,
+                preContext = "",
             )
 
-            val merged = mergeRecognizedText(currentNote.text, result.text)
-            repository.updateNoteText(noteId, merged)
+            val newText = replaceRecognizedMirrorText(currentNote.text, result.text)
+            repository.updateNoteText(noteId, newText)
             _recognitionState.value = RecognitionState.Success(result.text)
         } catch (e: Exception) {
             _recognitionState.value = RecognitionState.Error(e.message ?: "Ошибка распознавания")
@@ -136,12 +135,10 @@ class NoteEditorViewModel(
         repository.updateNoteStrokes(noteId, emptyList())
     }
 
-    companion object {
-        fun mergeRecognizedText(existing: String, recognized: String): String {
-            if (recognized.isBlank()) return existing
-            return if (existing.isBlank()) recognized else "$existing\n\n$recognized"
-        }
+    private fun replaceRecognizedMirrorText(existing: String, recognized: String): String =
+        if (recognized.isBlank()) existing else recognized
 
+    companion object {
         fun factory(
             repository: NotesRepository,
             noteId: String,
