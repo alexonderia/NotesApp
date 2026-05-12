@@ -5,12 +5,16 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.notesapp.core.handwriting.HandwritingBlockBuilder
 import com.example.notesapp.core.model.Folder
+import com.example.notesapp.core.model.HandwritingBlock
 import com.example.notesapp.core.model.InkStroke
 import com.example.notesapp.core.model.Note
 import com.example.notesapp.core.model.ToolType
 import com.example.notesapp.core.model.penStrokesOnly
 import com.example.notesapp.core.recognition.HandwritingRecognitionService
+import com.example.notesapp.core.recognition.RecognitionLanguageMode
+import com.example.notesapp.core.recognition.RecognitionOptions
 import com.example.notesapp.core.recognition.RecognitionState
+import com.example.notesapp.core.recognition.TextPostProcessor
 import com.example.notesapp.core.repository.NotesRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -30,6 +34,13 @@ class NoteEditorViewModel(
     private val noteId: String,
     private val recognitionService: HandwritingRecognitionService,
 ) : ViewModel() {
+
+    private val defaultRecognitionLanguageMode = RecognitionLanguageMode.RussianEnglishAuto
+
+    private fun recognitionOptions(preContext: String = "") = RecognitionOptions(
+        languageMode = defaultRecognitionLanguageMode,
+        preContext = preContext,
+    )
 
     val note: StateFlow<Note?> = repository.notes
         .map { list -> list.find { it.id == noteId } }
@@ -87,7 +98,7 @@ class NoteEditorViewModel(
             val newStrokes = n?.strokes?.penStrokesOnly()?.filter { it.id !in n.recognizedStrokeIds }.orEmpty()
             if (newStrokes.isNotEmpty()) {
                 viewModelScope.launch {
-                    runRecognizeNewStrokes(newStrokes)
+                    runRecognizeNewStrokes()
                     _editorMode.value = EditorMode.Text
                 }
                 return
@@ -109,7 +120,7 @@ class NoteEditorViewModel(
         }
 
         viewModelScope.launch {
-            runRecognizeNewStrokes(newStrokes)
+            runRecognizeNewStrokes()
         }
     }
 
@@ -149,40 +160,90 @@ class NoteEditorViewModel(
         _redoStack.value = emptyList()
     }
 
-    private suspend fun runRecognizeNewStrokes(newStrokes: List<InkStroke>) {
-        val penOnly = newStrokes.penStrokesOnly()
-        if (penOnly.isEmpty()) {
+    private fun assembleRecognizedText(blocks: List<HandwritingBlock>): String {
+        val nonEmpty = blocks
+            .sortedBy { it.orderIndex }
+            .filter { it.recognizedText.isNotBlank() }
+        if (nonEmpty.isEmpty()) return ""
+
+        val paragraphGap = HandwritingBlockBuilder.PARAGRAPH_ORDER_INDEX_GAP / 2
+        val groups = mutableListOf<MutableList<String>>()
+        var prev: HandwritingBlock? = null
+        for (block in nonEmpty) {
+            val text = block.recognizedText
+            if (prev == null) {
+                groups.add(mutableListOf(text))
+            } else {
+                val orderDelta = block.orderIndex - prev.orderIndex
+                if (orderDelta >= paragraphGap) {
+                    groups.add(mutableListOf(text))
+                } else {
+                    groups.last().add(text)
+                }
+            }
+            prev = block
+        }
+        return groups.joinToString("\n\n") { TextPostProcessor.assembleBlocks(it) }
+    }
+
+    private suspend fun recognizeBlocksInternal(
+        strokes: List<InkStroke>,
+    ): Pair<String, List<HandwritingBlock>> {
+        val penStrokes = strokes.penStrokesOnly()
+        if (penStrokes.isEmpty()) return "" to emptyList()
+
+        val templateBlocks = HandwritingBlockBuilder.build(penStrokes)
+        if (templateBlocks.isEmpty()) return "" to emptyList()
+
+        val strokeById = penStrokes.associateBy { it.id }
+        val now = System.currentTimeMillis()
+        val finalized = templateBlocks.map { block ->
+            val blockStrokes = block.strokeIds.mapNotNull { strokeById[it] }.penStrokesOnly()
+            val lineText = if (blockStrokes.isEmpty()) {
+                ""
+            } else {
+                val raw = recognitionService.recognize(
+                    strokes = blockStrokes,
+                    options = recognitionOptions(),
+                ).text
+                TextPostProcessor.cleanBlockText(raw)
+            }
+            block.copy(recognizedText = lineText, updatedAt = now)
+        }
+        val assembled = assembleRecognizedText(finalized)
+        return assembled to finalized
+    }
+
+    private suspend fun runRecognizeNewStrokes() {
+        val currentNote = note.value ?: return
+        val penAll = currentNote.strokes.penStrokesOnly()
+        val hasNew = penAll.any { it.id !in currentNote.recognizedStrokeIds }
+        if (!hasNew) {
+            _recognitionState.value = RecognitionState.Error("no_new_strokes")
+            return
+        }
+        if (penAll.isEmpty()) {
             _recognitionState.value = RecognitionState.Error("no_new_strokes")
             return
         }
         try {
             _recognitionState.value = RecognitionState.DownloadingModel
-            recognitionService.ensureRussianModelDownloaded()
+            recognitionService.ensureModelsDownloaded(defaultRecognitionLanguageMode)
 
             _recognitionState.value = RecognitionState.Recognizing
-            val currentNote = note.value ?: return
 
-            val result = recognitionService.recognizeRussian(
-                strokes = penOnly,
-                preContext = currentNote.recognizedText,
-            )
+            val (assembled, finalized) = recognizeBlocksInternal(penAll)
+            if (finalized.isEmpty()) {
+                _recognitionState.value = RecognitionState.Error("no_strokes")
+                return
+            }
 
-            val mergedRecognizedText = appendRecognizedChunk(currentNote.recognizedText, result.text)
-            val newIds = penOnly.map { it.id }.toSet()
-            val updatedIds = currentNote.recognizedStrokeIds + newIds
-
-            repository.updateRecognizedContent(noteId, mergedRecognizedText, updatedIds, null)
-            _recognitionState.value = RecognitionState.Success(result.text)
+            val allIds = penAll.map { it.id }.toSet()
+            repository.updateRecognizedContent(noteId, assembled, allIds, finalized)
+            _recognitionState.value = RecognitionState.Success(assembled)
         } catch (e: Exception) {
             _recognitionState.value = RecognitionState.Error(e.message ?: "Ошибка распознавания")
         }
-    }
-
-    private fun appendRecognizedChunk(existing: String, chunk: String): String {
-        val trimmedChunk = chunk.trim()
-        if (trimmedChunk.isEmpty()) return existing
-        if (existing.isBlank()) return trimmedChunk
-        return existing.trimEnd() + "\n\n" + trimmedChunk
     }
 
     private suspend fun runRecognizeAllStrokesReplace(allStrokes: List<InkStroke>) {
@@ -193,19 +254,19 @@ class NoteEditorViewModel(
         }
         try {
             _recognitionState.value = RecognitionState.DownloadingModel
-            recognitionService.ensureRussianModelDownloaded()
+            recognitionService.ensureModelsDownloaded(defaultRecognitionLanguageMode)
 
             _recognitionState.value = RecognitionState.Recognizing
 
-            val result = recognitionService.recognizeRussian(
-                strokes = penOnly,
-                preContext = "",
-            )
+            val (assembled, finalized) = recognizeBlocksInternal(penOnly)
+            if (finalized.isEmpty()) {
+                _recognitionState.value = RecognitionState.Error("no_strokes")
+                return
+            }
 
-            val replaced = result.text.trim()
             val allIds = penOnly.map { it.id }.toSet()
-            repository.updateRecognizedContent(noteId, replaced, allIds, emptyList())
-            _recognitionState.value = RecognitionState.Success(result.text)
+            repository.updateRecognizedContent(noteId, assembled, allIds, finalized)
+            _recognitionState.value = RecognitionState.Success(assembled)
         } catch (e: Exception) {
             _recognitionState.value = RecognitionState.Error(e.message ?: "Ошибка распознавания")
         }
@@ -219,33 +280,16 @@ class NoteEditorViewModel(
         }
         try {
             _recognitionState.value = RecognitionState.DownloadingModel
-            recognitionService.ensureRussianModelDownloaded()
+            recognitionService.ensureModelsDownloaded(defaultRecognitionLanguageMode)
 
             _recognitionState.value = RecognitionState.Recognizing
 
-            val templateBlocks = HandwritingBlockBuilder.build(penStrokes)
-            if (templateBlocks.isEmpty()) {
+            val (assembled, finalized) = recognizeBlocksInternal(penStrokes)
+            if (finalized.isEmpty()) {
                 _recognitionState.value = RecognitionState.Error("no_strokes")
                 return
             }
 
-            val strokeById = penStrokes.associateBy { it.id }
-            val now = System.currentTimeMillis()
-            val finalized = templateBlocks.map { block ->
-                val blockStrokes = block.strokeIds.mapNotNull { strokeById[it] }
-                    .penStrokesOnly()
-                val lineText = if (blockStrokes.isEmpty()) {
-                    ""
-                } else {
-                    recognitionService.recognizeRussian(
-                        strokes = blockStrokes,
-                        preContext = "",
-                    ).text.trim()
-                }
-                block.copy(recognizedText = lineText, updatedAt = now)
-            }
-
-            val assembled = finalized.sortedBy { it.orderIndex }.joinToString("\n") { it.recognizedText }
             val allIds = penStrokes.map { it.id }.toSet()
             repository.updateRecognizedContent(noteId, assembled, allIds, finalized)
             _recognitionState.value = RecognitionState.Success(assembled)

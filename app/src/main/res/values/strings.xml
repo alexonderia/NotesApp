@@ -41,6 +41,9 @@
     <string name="editor_tool_pen">Ручка</string>
     <string name="editor_tool_eraser">Ластик</string>
     <string name="label_folder">Папка</string>
+    <string name="editor_note_properties">Свойства заметки</string>
+    <string name="editor_menu_more">Дополнительно</string>
+    <string name="editor_text_panel_title">Текст заметки</string>
 
     <!-- Settings -->
     <string name="settings_title">Настройки</string>
@@ -67,6 +70,7 @@
     <string name="recognition_action_new">Распознать новое</string>
     <string name="recognition_action_rerun_all">Перераспознать всё</string>
     <string name="recognition_action_by_lines">Распознать по строкам</string>
+    <string name="recognition_action_primary">Распознать</string>
     <string name="recognition_blocks_status">Блоков: %1$d</string>
     <string name="recognition_no_new_strokes">Нет новых рукописных фрагментов</string>
     <string name="recognition_strokes_status">Распознано штрихов: %1$d из %2$d</string>
