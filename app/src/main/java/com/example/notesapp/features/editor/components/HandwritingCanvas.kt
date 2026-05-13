@@ -49,9 +49,10 @@ fun HandwritingCanvas(
     onStrokesReplace: (List<InkStroke>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val shape = RoundedCornerShape(12.dp)
-    val borderColor = MaterialTheme.colorScheme.outlineVariant
-    val canvasBackground = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+    val shape = RoundedCornerShape(20.dp)
+    val borderColor = MaterialTheme.colorScheme.outline.copy(alpha = 0.12f)
+    val canvasBackground = MaterialTheme.colorScheme.surface
+    val gridColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.05f)
 
     val strokesState = rememberUpdatedState(strokes)
     val onPenStrokeFinishedState = rememberUpdatedState(onPenStrokeFinished)
@@ -303,6 +304,7 @@ fun HandwritingCanvas(
         val drawEpoch = drawInvalidateTick
 
         drawRect(color = canvasBackground, size = size)
+        drawLightRuledLines(gridColor)
 
         val s = strokes
         for (i in s.indices) {
@@ -313,6 +315,21 @@ fun HandwritingCanvas(
         if (selectedTool == ToolType.Pen && currentStrokePoints.size >= 2) {
             drawStrokePolyline(strokePath, currentStrokePoints, penColor, penWidth)
         }
+    }
+}
+
+private fun DrawScope.drawLightRuledLines(lineColor: Color) {
+    val stepY = 48.dp.toPx()
+    if (stepY <= 0f) return
+    var y = stepY
+    while (y < size.height) {
+        drawLine(
+            color = lineColor,
+            start = Offset(0f, y),
+            end = Offset(size.width, y),
+            strokeWidth = 1f,
+        )
+        y += stepY
     }
 }
 

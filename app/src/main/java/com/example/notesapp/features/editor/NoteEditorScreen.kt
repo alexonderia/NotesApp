@@ -1,5 +1,6 @@
 package com.example.notesapp.features.editor
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -14,31 +15,37 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Redo
 import androidx.compose.material.icons.automirrored.filled.Undo
 import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.BorderColor
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.RemoveCircleOutline
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CenterAlignedTopAppBar
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -46,14 +53,16 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SegmentedButton
-import androidx.compose.material3.SegmentedButtonDefaults
-import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -66,7 +75,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -79,10 +91,12 @@ import com.example.notesapp.core.recognition.HandwritingRecognitionService
 import com.example.notesapp.core.recognition.RecognitionState
 import com.example.notesapp.core.repository.NotesRepository
 import com.example.notesapp.features.editor.components.HandwritingCanvas
+import kotlin.math.abs
 
 private val TabletBreakpoint = 700.dp
+private val TabletPaperMaxWidth = 760.dp
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun NoteEditorScreen(
     repository: NotesRepository,
@@ -106,7 +120,17 @@ fun NoteEditorScreen(
 
     var showPropertiesSheet by remember { mutableStateOf(false) }
     var menuExpanded by remember { mutableStateOf(false) }
+    var showClearHandwritingDialog by remember { mutableStateOf(false) }
     val propertiesSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    val pagerState = rememberPagerState(pageCount = { 2 })
+
+    LaunchedEffect(editorMode) {
+        val target = editorMode.ordinal
+        if (pagerState.currentPage != target) {
+            pagerState.animateScrollToPage(target)
+        }
+    }
 
     LaunchedEffect(recognitionState) {
         when (val state = recognitionState) {
@@ -129,13 +153,15 @@ fun NoteEditorScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background,
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
-            CenterAlignedTopAppBar(
+            TopAppBar(
                 title = {
                     Text(
-                        note?.title ?: stringResource(R.string.note_unknown),
+                        text = note?.title ?: stringResource(R.string.note_unknown),
                         maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                         style = MaterialTheme.typography.titleLarge,
                     )
                 },
@@ -148,6 +174,14 @@ fun NoteEditorScreen(
                     }
                 },
                 actions = {
+                    IconButton(
+                        onClick = { showPropertiesSheet = true },
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.EditNote,
+                            contentDescription = stringResource(R.string.editor_note_properties),
+                        )
+                    }
                     Box {
                         IconButton(onClick = { menuExpanded = true }) {
                             Icon(
@@ -185,12 +219,16 @@ fun NoteEditorScreen(
                                 text = { Text(stringResource(R.string.editor_clear)) },
                                 onClick = {
                                     menuExpanded = false
-                                    viewModel.onClearStrokes()
+                                    showClearHandwritingDialog = true
                                 },
                             )
                         }
                     }
                 },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                ),
             )
         },
     ) { innerPadding ->
@@ -201,39 +239,16 @@ fun NoteEditorScreen(
                 .imePadding()
                 .padding(horizontal = 12.dp, vertical = 8.dp),
         ) {
-            val isTablet = maxWidth >= TabletBreakpoint
-            if (isTablet) {
-                if (editorMode == EditorMode.Text) {
-                    Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        EditorModeSelector(
-                            editorMode = editorMode,
-                            onModeChange = viewModel::setEditorMode,
-                            modifier = Modifier.widthIn(max = 420.dp),
-                        )
-                        TextMirrorPanel(
-                            note = note,
-                            onManualTextChange = viewModel::onManualTextChange,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .weight(1f),
-                        )
-                    }
-                } else {
-                    TabletSplitEditorLayout(
-                        note = note,
-                        viewModel = viewModel,
-                        recognitionState = recognitionState,
-                        onSwitchToText = { viewModel.setEditorMode(EditorMode.Text) },
-                    )
-                }
-            } else {
-                CompactEditorLayout(
-                    note = note,
-                    editorMode = editorMode,
-                    viewModel = viewModel,
-                    recognitionState = recognitionState,
-                )
-            }
+            val paperMaxWidth = if (maxWidth >= TabletBreakpoint) TabletPaperMaxWidth else null
+            EditorTwoPagesLayout(
+                editorMode = editorMode,
+                onEditorModeChange = viewModel::setEditorMode,
+                pagerState = pagerState,
+                note = note,
+                viewModel = viewModel,
+                recognitionState = recognitionState,
+                paperMaxWidth = paperMaxWidth,
+            )
         }
     }
 
@@ -241,12 +256,14 @@ fun NoteEditorScreen(
         ModalBottomSheet(
             onDismissRequest = { showPropertiesSheet = false },
             sheetState = propertiesSheetState,
+            shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
         ) {
             NotePropertiesSheetContent(
                 note = note,
                 folders = folders,
                 onTitleChange = viewModel::onTitleChange,
                 onFolderSelected = viewModel::onFolderSelected,
+                onDone = { showPropertiesSheet = false },
                 modifier = Modifier
                     .fillMaxWidth()
                     .navigationBarsPadding()
@@ -254,6 +271,114 @@ fun NoteEditorScreen(
             )
             Spacer(Modifier.height(24.dp))
         }
+    }
+
+    if (showClearHandwritingDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearHandwritingDialog = false },
+            title = { Text(stringResource(R.string.editor_clear_confirm_title)) },
+            text = { Text(stringResource(R.string.editor_clear_confirm_message)) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showClearHandwritingDialog = false
+                        viewModel.onClearStrokes()
+                    },
+                ) {
+                    Text(stringResource(R.string.editor_clear_confirm_action))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearHandwritingDialog = false }) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
+@Composable
+private fun EditorTwoPagesLayout(
+    editorMode: EditorMode,
+    onEditorModeChange: (EditorMode) -> Unit,
+    pagerState: PagerState,
+    note: Note?,
+    viewModel: NoteEditorViewModel,
+    recognitionState: RecognitionState,
+    paperMaxWidth: Dp?,
+) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        PrimaryTabRow(
+            selectedTabIndex = editorMode.ordinal,
+            modifier = Modifier.fillMaxWidth(),
+        ) {
+            Tab(
+                selected = editorMode == EditorMode.Handwriting,
+                onClick = { onEditorModeChange(EditorMode.Handwriting) },
+                text = { Text(stringResource(R.string.editor_mode_handwriting)) },
+            )
+            Tab(
+                selected = editorMode == EditorMode.Text,
+                onClick = { onEditorModeChange(EditorMode.Text) },
+                text = { Text(stringResource(R.string.editor_mode_printed)) },
+            )
+        }
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier
+                .weight(1f)
+                .fillMaxWidth(),
+            userScrollEnabled = false,
+            beyondViewportPageCount = 1,
+        ) { page ->
+            when (page) {
+                0 -> {
+                    Column(Modifier.fillMaxSize()) {
+                        HandwritingWorkspace(
+                            note = note,
+                            viewModel = viewModel,
+                            recognitionState = recognitionState,
+                            toolsModifier = Modifier.fillMaxWidth(),
+                            canvasModifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f),
+                            paperMaxWidth = paperMaxWidth,
+                        )
+                    }
+                }
+                else -> {
+                    TypedTextPage(
+                        note = note,
+                        onManualTextChange = viewModel::onManualTextChange,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TypedTextPage(
+    note: Note?,
+    onManualTextChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp, bottomStart = 20.dp, bottomEnd = 20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = 0.dp,
+    ) {
+        TextMirrorPanel(
+            note = note,
+            onManualTextChange = onManualTextChange,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 12.dp, vertical = 12.dp),
+            showSectionTitle = true,
+        )
     }
 }
 
@@ -263,13 +388,23 @@ private fun NotePropertiesSheetContent(
     folders: List<Folder>,
     onTitleChange: (String) -> Unit,
     onFolderSelected: (String?) -> Unit,
+    onDone: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text(
-            text = stringResource(R.string.editor_note_properties),
-            style = MaterialTheme.typography.titleLarge,
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.editor_note_properties),
+                style = MaterialTheme.typography.titleLarge,
+            )
+            TextButton(onClick = onDone) {
+                Text(stringResource(R.string.editor_done))
+            }
+        }
         OutlinedTextField(
             value = note?.title ?: "",
             onValueChange = onTitleChange,
@@ -287,135 +422,13 @@ private fun NotePropertiesSheetContent(
 }
 
 @Composable
-private fun CompactEditorLayout(
-    note: Note?,
-    editorMode: EditorMode,
-    viewModel: NoteEditorViewModel,
-    recognitionState: RecognitionState,
-) {
-    Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        EditorModeSelector(
-            editorMode = editorMode,
-            onModeChange = viewModel::setEditorMode,
-            modifier = Modifier.fillMaxWidth(),
-        )
-        when (editorMode) {
-            EditorMode.Handwriting -> {
-                HandwritingWorkspace(
-                    note = note,
-                    viewModel = viewModel,
-                    recognitionState = recognitionState,
-                    toolsModifier = Modifier.fillMaxWidth(),
-                    canvasModifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                )
-            }
-            EditorMode.Text -> {
-                TextMirrorPanel(
-                    note = note,
-                    onManualTextChange = viewModel::onManualTextChange,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun TabletSplitEditorLayout(
-    note: Note?,
-    viewModel: NoteEditorViewModel,
-    recognitionState: RecognitionState,
-    onSwitchToText: () -> Unit,
-) {
-    Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        EditorModeSelector(
-            editorMode = EditorMode.Handwriting,
-            onModeChange = { mode ->
-                if (mode == EditorMode.Text) onSwitchToText()
-            },
-            modifier = Modifier.widthIn(max = 420.dp),
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            Column(
-                modifier = Modifier
-                    .weight(0.58f)
-                    .fillMaxHeight(),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                HandwritingWorkspace(
-                    note = note,
-                    viewModel = viewModel,
-                    recognitionState = recognitionState,
-                    toolsModifier = Modifier.widthIn(max = 480.dp),
-                    canvasModifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                )
-            }
-            VerticalDivider(modifier = Modifier.fillMaxHeight().padding(vertical = 4.dp))
-            Column(
-                modifier = Modifier
-                    .weight(0.42f)
-                    .fillMaxHeight(),
-            ) {
-                Text(
-                    text = stringResource(R.string.editor_text_panel_title),
-                    style = MaterialTheme.typography.titleSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(bottom = 8.dp),
-                )
-                TextMirrorPanel(
-                    note = note,
-                    onManualTextChange = viewModel::onManualTextChange,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun EditorModeSelector(
-    editorMode: EditorMode,
-    onModeChange: (EditorMode) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    SingleChoiceSegmentedButtonRow(modifier = modifier) {
-        SegmentedButton(
-            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-            onClick = { onModeChange(EditorMode.Handwriting) },
-            selected = editorMode == EditorMode.Handwriting,
-        ) {
-            Text(stringResource(R.string.editor_mode_handwriting))
-        }
-        SegmentedButton(
-            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-            onClick = { onModeChange(EditorMode.Text) },
-            selected = editorMode == EditorMode.Text,
-        ) {
-            Text(stringResource(R.string.editor_mode_text))
-        }
-    }
-}
-
-@Composable
 private fun HandwritingWorkspace(
     note: Note?,
     viewModel: NoteEditorViewModel,
     recognitionState: RecognitionState,
     toolsModifier: Modifier,
     canvasModifier: Modifier,
+    paperMaxWidth: Dp?,
 ) {
     val strokes = note?.strokes ?: emptyList()
     val penStrokes = strokes.penStrokesOnly()
@@ -429,6 +442,11 @@ private fun HandwritingWorkspace(
     val selectedWidth by viewModel.selectedWidth.collectAsStateWithLifecycle()
     val redoStack by viewModel.redoStack.collectAsStateWithLifecycle()
 
+    val onPrimaryRecognize = {
+        if (hasNewStrokes) viewModel.recognizeNewHandwriting()
+        else viewModel.recognizeAllHandwriting()
+    }
+
     Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         HandwritingToolbar(
             selectedTool = selectedTool,
@@ -441,18 +459,10 @@ private fun HandwritingWorkspace(
             canRedo = redoStack.isNotEmpty(),
             onUndo = viewModel::onUndoStroke,
             onRedo = viewModel::onRedoStroke,
-            onClear = viewModel::onClearStrokes,
-            canClear = strokes.isNotEmpty(),
+            canRecognize = penStrokes.isNotEmpty() && !isBusy,
+            onRecognize = onPrimaryRecognize,
             enabled = !isBusy,
             modifier = toolsModifier,
-        )
-        RecognitionPrimaryRow(
-            penStrokesNotEmpty = penStrokes.isNotEmpty(),
-            isBusy = isBusy,
-            onPrimaryRecognize = {
-                if (hasNewStrokes) viewModel.recognizeNewHandwriting()
-                else viewModel.recognizeAllHandwriting()
-            },
         )
         if (isBusy) {
             Row(
@@ -473,36 +483,36 @@ private fun HandwritingWorkspace(
                 )
             }
         }
-        HandwritingCanvas(
-            strokes = strokes,
-            selectedTool = selectedTool,
-            penColor = selectedColor,
-            penWidth = selectedWidth,
-            eraserRadius = 40f,
-            onPenStrokeFinished = viewModel::onStrokeAdded,
-            onStrokesReplace = viewModel::onStrokesReplaceAfterErase,
+        Box(
             modifier = canvasModifier,
-        )
-    }
-}
-
-@Composable
-private fun RecognitionPrimaryRow(
-    penStrokesNotEmpty: Boolean,
-    isBusy: Boolean,
-    onPrimaryRecognize: () -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        FilledTonalButton(
-            onClick = onPrimaryRecognize,
-            enabled = penStrokesNotEmpty && !isBusy,
-            modifier = Modifier.widthIn(min = 160.dp),
+            contentAlignment = Alignment.Center,
         ) {
-            Text(stringResource(R.string.recognition_action_primary))
+            val surfaceModifier = if (paperMaxWidth != null) {
+                Modifier
+                    .widthIn(max = paperMaxWidth)
+                    .fillMaxWidth()
+                    .fillMaxHeight()
+            } else {
+                Modifier.fillMaxSize()
+            }
+            Surface(
+                modifier = surfaceModifier,
+                shape = RoundedCornerShape(20.dp),
+                tonalElevation = 2.dp,
+                shadowElevation = 6.dp,
+                color = MaterialTheme.colorScheme.surface,
+            ) {
+                HandwritingCanvas(
+                    strokes = strokes,
+                    selectedTool = selectedTool,
+                    penColor = selectedColor,
+                    penWidth = selectedWidth,
+                    eraserRadius = 40f,
+                    onPenStrokeFinished = viewModel::onStrokeAdded,
+                    onStrokesReplace = viewModel::onStrokesReplaceAfterErase,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
         }
     }
 }
@@ -512,6 +522,7 @@ private fun TextMirrorPanel(
     note: Note?,
     onManualTextChange: (String) -> Unit,
     modifier: Modifier = Modifier,
+    showSectionTitle: Boolean = true,
 ) {
     val current = note
     if (current == null) {
@@ -523,15 +534,36 @@ private fun TextMirrorPanel(
         modifier = modifier.verticalScroll(scroll),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        OutlinedTextField(
-            value = current.recognizedText,
-            onValueChange = {},
-            readOnly = true,
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text(stringResource(R.string.editor_recognized_label)) },
-            placeholder = { Text(stringResource(R.string.editor_recognized_empty_hint)) },
-            minLines = 4,
-        )
+        if (showSectionTitle) {
+            Text(
+                text = stringResource(R.string.editor_text_panel_title),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = MaterialTheme.colorScheme.surface,
+            ),
+            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        ) {
+            Column(Modifier.padding(12.dp)) {
+                Text(
+                    text = stringResource(R.string.editor_recognized_label),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = current.recognizedText.ifBlank {
+                        stringResource(R.string.editor_recognized_empty_hint)
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+        }
         OutlinedTextField(
             value = current.manualText,
             onValueChange = onManualTextChange,
@@ -539,6 +571,7 @@ private fun TextMirrorPanel(
             label = { Text(stringResource(R.string.editor_manual_label)) },
             placeholder = { Text(stringResource(R.string.editor_manual_hint)) },
             minLines = 4,
+            shape = RoundedCornerShape(16.dp),
         )
     }
 }
@@ -554,104 +587,159 @@ private fun HandwritingToolbar(
     onColorChange: (Long) -> Unit,
     canUndo: Boolean,
     canRedo: Boolean,
-    canClear: Boolean,
+    canRecognize: Boolean,
+    onRecognize: () -> Unit,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
-    onClear: () -> Unit,
     enabled: Boolean,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    val scroll = rememberScrollState()
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(20.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = 1.dp,
+    ) {
         Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()),
+            modifier = Modifier
+                .horizontalScroll(scroll)
+                .padding(horizontal = 8.dp, vertical = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            ToolSelector(
-                selectedTool = selectedTool,
-                onToolChange = onToolChange,
+            ToolIconToggle(
+                selected = selectedTool == ToolType.Pen,
+                onClick = { onToolChange(ToolType.Pen) },
                 enabled = enabled,
+                contentDescription = stringResource(R.string.editor_tool_pen),
+                icon = Icons.Filled.BorderColor,
             )
-            HistoryActions(
-                canUndo = canUndo,
-                canRedo = canRedo,
-                canClear = canClear,
-                onUndo = onUndo,
-                onRedo = onRedo,
-                onClear = onClear,
+            ToolIconToggle(
+                selected = selectedTool == ToolType.Eraser,
+                onClick = { onToolChange(ToolType.Eraser) },
                 enabled = enabled,
+                contentDescription = stringResource(R.string.editor_tool_eraser),
+                icon = Icons.Outlined.RemoveCircleOutline,
             )
-        }
-        Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            StrokeWidthSelector(
+            VerticalDivider(
+                modifier = Modifier
+                    .height(28.dp)
+                    .padding(horizontal = 2.dp),
+            )
+            FilledTonalIconButton(
+                onClick = onUndo,
+                enabled = canUndo && enabled,
+                modifier = Modifier.size(40.dp),
+            ) {
+                Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = stringResource(R.string.editor_undo))
+            }
+            FilledTonalIconButton(
+                onClick = onRedo,
+                enabled = canRedo && enabled,
+                modifier = Modifier.size(40.dp),
+            ) {
+                Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = stringResource(R.string.editor_redo))
+            }
+            VerticalDivider(
+                modifier = Modifier
+                    .height(28.dp)
+                    .padding(horizontal = 2.dp),
+            )
+            StrokeWidthChips(
                 selectedWidth = selectedWidth,
                 onWidthChange = onWidthChange,
                 enabled = enabled,
             )
-        }
-        Row(
-            modifier = Modifier.horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            ColorSelector(
+            VerticalDivider(
+                modifier = Modifier
+                    .height(28.dp)
+                    .padding(horizontal = 2.dp),
+            )
+            ColorSwatches(
                 selectedColor = selectedColor,
                 onColorChange = onColorChange,
                 enabled = enabled,
             )
+            VerticalDivider(
+                modifier = Modifier
+                    .height(28.dp)
+                    .padding(horizontal = 2.dp),
+            )
+            FilledTonalIconButton(
+                onClick = onRecognize,
+                enabled = canRecognize && enabled,
+                modifier = Modifier.size(44.dp),
+            ) {
+                Icon(
+                    Icons.Filled.AutoAwesome,
+                    contentDescription = stringResource(R.string.recognition_action_primary),
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun ToolSelector(
-    selectedTool: ToolType,
-    onToolChange: (ToolType) -> Unit,
+private fun ToolIconToggle(
+    selected: Boolean,
+    onClick: () -> Unit,
     enabled: Boolean,
+    contentDescription: String,
+    icon: ImageVector,
 ) {
-    FilterChip(
-        selected = selectedTool == ToolType.Pen,
-        onClick = { onToolChange(ToolType.Pen) },
-        label = { Text(stringResource(R.string.editor_tool_pen)) },
-        leadingIcon = {
-            Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
-        },
+    IconButton(
+        onClick = onClick,
         enabled = enabled,
-    )
-    FilterChip(
-        selected = selectedTool == ToolType.Eraser,
-        onClick = { onToolChange(ToolType.Eraser) },
-        label = { Text(stringResource(R.string.editor_tool_eraser)) },
-        leadingIcon = {
-            Icon(Icons.Outlined.RemoveCircleOutline, contentDescription = null, modifier = Modifier.size(18.dp))
-        },
-        enabled = enabled,
-    )
-}
-
-@Composable
-private fun StrokeWidthSelector(
-    selectedWidth: Float,
-    onWidthChange: (Float) -> Unit,
-    enabled: Boolean,
-) {
-    val widths = listOf(2f, 4f, 8f, 12f)
-    widths.forEach { w ->
-        FilterChip(
-            selected = kotlin.math.abs(selectedWidth - w) < 0.5f,
-            onClick = { onWidthChange(w) },
-            label = { Text("${w.toInt()}") },
-            enabled = enabled,
+        modifier = Modifier
+            .size(40.dp)
+            .clip(CircleShape)
+            .background(
+                if (selected) {
+                    MaterialTheme.colorScheme.primaryContainer
+                } else {
+                    Color.Transparent
+                },
+            ),
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            modifier = Modifier.size(22.dp),
+            tint = if (selected) {
+                MaterialTheme.colorScheme.onPrimaryContainer
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            },
         )
     }
 }
 
 @Composable
-private fun ColorSelector(
+private fun StrokeWidthChips(
+    selectedWidth: Float,
+    onWidthChange: (Float) -> Unit,
+    enabled: Boolean,
+) {
+    val widths = listOf(2f, 4f, 8f, 12f)
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        widths.forEach { w ->
+            FilterChip(
+                selected = abs(selectedWidth - w) < 0.5f,
+                onClick = { onWidthChange(w) },
+                label = { Text("${w.toInt()}") },
+                enabled = enabled,
+                modifier = Modifier.heightIn(min = 32.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun ColorSwatches(
     selectedColor: Long,
     onColorChange: (Long) -> Unit,
     enabled: Boolean,
@@ -662,45 +750,26 @@ private fun ColorSelector(
         0xFFD32F2FL,
         0xFF388E3CL,
     )
-    palette.forEach { c ->
-        val selected = selectedColor == c
-        Box(
-            modifier = Modifier
-                .size(32.dp)
-                .clip(CircleShape)
-                .background(Color(c))
-                .border(
-                    width = if (selected) 3.dp else 1.dp,
-                    color = if (selected) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
-                    },
-                    shape = CircleShape,
-                )
-                .clickable(enabled = enabled) { onColorChange(c) },
-        )
-    }
-}
-
-@Composable
-private fun HistoryActions(
-    canUndo: Boolean,
-    canRedo: Boolean,
-    canClear: Boolean,
-    onUndo: () -> Unit,
-    onRedo: () -> Unit,
-    onClear: () -> Unit,
-    enabled: Boolean,
-) {
-    FilledTonalIconButton(onClick = onUndo, enabled = canUndo && enabled) {
-        Icon(Icons.AutoMirrored.Filled.Undo, contentDescription = stringResource(R.string.editor_undo))
-    }
-    FilledTonalIconButton(onClick = onRedo, enabled = canRedo && enabled) {
-        Icon(Icons.AutoMirrored.Filled.Redo, contentDescription = stringResource(R.string.editor_redo))
-    }
-    FilledTonalIconButton(onClick = onClear, enabled = canClear && enabled) {
-        Icon(Icons.Filled.Delete, contentDescription = stringResource(R.string.editor_clear))
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+        palette.forEach { c ->
+            val selected = selectedColor == c
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(Color(c))
+                    .border(
+                        width = if (selected) 2.dp else 1.dp,
+                        color = if (selected) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.outline.copy(alpha = 0.35f)
+                        },
+                        shape = CircleShape,
+                    )
+                    .clickable(enabled = enabled) { onColorChange(c) },
+            )
+        }
     }
 }
 
@@ -732,6 +801,7 @@ private fun FolderSelector(
         modifier = modifier
             .fillMaxWidth()
             .clickable { showFolderPicker = true },
+        shape = RoundedCornerShape(16.dp),
     )
 
     if (showFolderPicker) {

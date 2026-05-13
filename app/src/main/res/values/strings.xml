@@ -27,8 +27,9 @@
     <string name="filter_all">Все</string>
 
     <!-- Editor -->
-    <string name="editor_mode_handwriting">Рукописный</string>
+    <string name="editor_mode_handwriting">Рукопись</string>
     <string name="editor_mode_text">Текст</string>
+    <string name="editor_mode_printed">Напечатанный</string>
     <string name="editor_recognized_label">Распознанный текст</string>
     <string name="editor_manual_label">Дополнения</string>
     <string name="editor_recognized_empty_hint">Распознайте рукописный текст</string>
@@ -43,7 +44,11 @@
     <string name="label_folder">Папка</string>
     <string name="editor_note_properties">Свойства заметки</string>
     <string name="editor_menu_more">Дополнительно</string>
-    <string name="editor_text_panel_title">Текст заметки</string>
+    <string name="editor_text_panel_title">Текст</string>
+    <string name="editor_done">Готово</string>
+    <string name="editor_clear_confirm_title">Очистить рукопись?</string>
+    <string name="editor_clear_confirm_message">Все штрихи на странице будут удалены. Это действие нельзя отменить через отмену штриха.</string>
+    <string name="editor_clear_confirm_action">Очистить</string>
 
     <!-- Settings -->
     <string name="settings_title">Настройки</string>

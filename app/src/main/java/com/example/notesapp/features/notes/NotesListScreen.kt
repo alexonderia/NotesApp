@@ -1,5 +1,6 @@
 package com.example.notesapp.features.notes
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -17,6 +18,7 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Folder
@@ -24,8 +26,8 @@ import androidx.compose.material.icons.filled.FolderOff
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material3.Button
-import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
@@ -33,7 +35,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -54,10 +59,12 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import kotlinx.coroutines.flow.StateFlow
 
-private val WideLayoutMinWidth = 600.dp
-private val ContentMaxWidth = 880.dp
+private val WideTwoColMinWidth = 600.dp
+private val WideThreeColMinWidth = 960.dp
+private val ContentMaxWidth = 1200.dp
 private val GridSpacing = 16.dp
 private val CardPadding = 16.dp
+private val CardCorner = 20.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -77,9 +84,15 @@ fun NotesListScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
+        containerColor = MaterialTheme.colorScheme.background,
         topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text(stringResource(R.string.notes_title)) },
+            TopAppBar(
+                title = {
+                    Text(
+                        text = stringResource(R.string.notes_title),
+                        style = MaterialTheme.typography.titleLarge,
+                    )
+                },
                 actions = {
                     IconButton(onClick = onOpenFolders) {
                         Icon(
@@ -94,6 +107,10 @@ fun NotesListScreen(
                         )
                     }
                 },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                    scrolledContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+                ),
             )
         },
         floatingActionButton = {
@@ -103,6 +120,7 @@ fun NotesListScreen(
                         val id = viewModel.createNote()
                         onOpenNote(id)
                     },
+                    shape = RoundedCornerShape(16.dp),
                 ) {
                     Icon(
                         imageVector = Icons.Default.Add,
@@ -133,18 +151,21 @@ fun NotesListScreen(
                 onSelect = viewModel::setFilter,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
             )
 
             BoxWithConstraints(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
-                    .padding(horizontal = 24.dp)
-                    .padding(vertical = 8.dp),
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 16.dp),
             ) {
-                val wide = maxWidth >= WideLayoutMinWidth
-                val columnCount = if (wide) 2 else 1
+                val columnCount = when {
+                    maxWidth >= WideThreeColMinWidth -> 3
+                    maxWidth >= WideTwoColMinWidth -> 2
+                    else -> 1
+                }
 
                 if (noteCards.isEmpty()) {
                     NotesListEmptyState(
@@ -188,37 +209,45 @@ private fun FolderFilterRow(
     onSelect: (FolderFilter) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    LazyRow(
+    Surface(
         modifier = modifier,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        tonalElevation = 1.dp,
     ) {
-        item {
-            FilterChip(
-                selected = selected is FolderFilter.All,
-                onClick = { onSelect(FolderFilter.All) },
-                label = { Text(stringResource(R.string.filter_all)) },
-            )
-        }
-        item {
-            FilterChip(
-                selected = selected is FolderFilter.NoFolder,
-                onClick = { onSelect(FolderFilter.NoFolder) },
-                label = { Text(stringResource(R.string.folder_none)) },
-            )
-        }
-        items(items = folders, key = { it.id }) { folder ->
-            FilterChip(
-                selected = selected is FolderFilter.InFolder && selected.folderId == folder.id,
-                onClick = { onSelect(FolderFilter.InFolder(folder.id)) },
-                label = { Text(folder.name) },
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Default.Folder,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp),
-                    )
-                },
-            )
+        LazyRow(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            item {
+                FilterChip(
+                    selected = selected is FolderFilter.All,
+                    onClick = { onSelect(FolderFilter.All) },
+                    label = { Text(stringResource(R.string.filter_all)) },
+                )
+            }
+            item {
+                FilterChip(
+                    selected = selected is FolderFilter.NoFolder,
+                    onClick = { onSelect(FolderFilter.NoFolder) },
+                    label = { Text(stringResource(R.string.folder_none)) },
+                )
+            }
+            items(items = folders, key = { it.id }) { folder ->
+                FilterChip(
+                    selected = selected is FolderFilter.InFolder && selected.folderId == folder.id,
+                    onClick = { onSelect(FolderFilter.InFolder(folder.id)) },
+                    label = { Text(folder.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Default.Folder,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp),
+                        )
+                    },
+                )
+            }
         }
     }
 }
@@ -252,10 +281,15 @@ private fun NoteSummaryCard(
     }
     val dateLabel = formatModifiedAt(card.lastModifiedEpochMs, dateFormatter)
 
-    ElevatedCard(
+    Card(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick),
+        shape = RoundedCornerShape(CardCorner),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface,
+        ),
     ) {
         Column(modifier = Modifier.padding(CardPadding)) {
             Text(
@@ -269,7 +303,7 @@ private fun NoteSummaryCard(
                 text = preview,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 2,
+                maxLines = 3,
                 overflow = TextOverflow.Ellipsis,
             )
             Spacer(modifier = Modifier.height(12.dp))
@@ -288,7 +322,7 @@ private fun NoteSummaryCard(
                         Icon(
                             imageVector = Icons.Default.Folder,
                             contentDescription = null,
-                            modifier = Modifier.size(18.dp),
+                            modifier = Modifier.size(16.dp),
                             tint = MaterialTheme.colorScheme.primary,
                         )
                         Text(
@@ -314,28 +348,34 @@ private fun NoteSummaryCard(
 
 @Composable
 private fun NotesListEmptyState(modifier: Modifier = Modifier) {
-    Column(
-        modifier = modifier.padding(32.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+    Surface(
+        modifier = modifier.padding(24.dp),
+        shape = RoundedCornerShape(24.dp),
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
     ) {
-        Icon(
-            imageVector = Icons.Outlined.EditNote,
-            contentDescription = null,
-            modifier = Modifier.size(80.dp),
-            tint = MaterialTheme.colorScheme.secondary,
-        )
-        Text(
-            text = stringResource(R.string.notes_empty_title),
-            style = MaterialTheme.typography.headlineSmall,
-            textAlign = TextAlign.Center,
-        )
-        Text(
-            text = stringResource(R.string.notes_empty_subtitle),
-            style = MaterialTheme.typography.bodyLarge,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            textAlign = TextAlign.Center,
-        )
+        Column(
+            modifier = Modifier.padding(32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.EditNote,
+                contentDescription = null,
+                modifier = Modifier.size(72.dp),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+            Text(
+                text = stringResource(R.string.notes_empty_title),
+                style = MaterialTheme.typography.titleLarge,
+                textAlign = TextAlign.Center,
+            )
+            Text(
+                text = stringResource(R.string.notes_empty_subtitle),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+            )
+        }
     }
 }
 

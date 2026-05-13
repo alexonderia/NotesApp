@@ -13,3 +13,8 @@
 .externalNativeBuild
 .cxx
 local.properties
+AGENTS.md
+/.agents 
+/.codex 
+/.cursor
+/.trellis
