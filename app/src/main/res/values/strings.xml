@@ -84,6 +84,8 @@
     <string name="recognition_success">Текст распознан</string>
     <string name="recognition_error">Не удалось распознать текст</string>
     <string name="recognition_no_strokes">Нет рукописного текста для распознавания</string>
+    <string name="recognition_empty_no_prior">Не удалось извлечь текст из рукописи. Попробуйте ещё раз или измените написание.</string>
+    <string name="recognition_empty_kept_prior">Распознанный текст не обновлён: пустой результат. Ранее сохранённый текст оставлен без изменений.</string>
     <string name="recognition_russian_model_error">Ошибка загрузки модели русского языка</string>
     <string name="recognition_append_separator">\n\n</string>
 

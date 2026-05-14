@@ -10,6 +10,12 @@ object TextPostProcessor {
     /** Буква в любой поддерживаемой локали (латиница, кириллица и т.д.). */
     private val punctuationThenLetter = Regex("""([.,:;!?)\]])(\p{L})""")
 
+    /** Типичные разрывы слова пробелом после печатного рукописного ввода (см. Digital Ink + кириллица). */
+    private val ruInkLetterSplits = listOf(
+        Regex("""(?iu)ну\s+жно""") to "нужно",
+        Regex("""(?iu)вишн\s+я""") to "вишня",
+    )
+
     fun cleanBlockText(raw: String): String {
         val normalized = raw.trim().replace("\r\n", "\n")
         if (normalized.isEmpty()) return ""
@@ -29,6 +35,9 @@ object TextPostProcessor {
     private fun cleanSingleLine(line: String): String {
         var s = line.trim()
         if (s.isEmpty()) return ""
+        for ((pattern, replacement) in ruInkLetterSplits) {
+            s = pattern.replace(s, replacement)
+        }
         s = horizontalWhitespace.replace(s, " ")
         while (true) {
             val next = spaceBeforePunctuation.replace(s, "$1")

@@ -117,6 +117,8 @@ fun NoteEditorScreen(
     val successMessage = stringResource(R.string.recognition_success)
     val noStrokesMessage = stringResource(R.string.recognition_no_strokes)
     val noNewStrokesMessage = stringResource(R.string.recognition_no_new_strokes)
+    val recognitionEmptyNoPrior = stringResource(R.string.recognition_empty_no_prior)
+    val recognitionEmptyKeptPrior = stringResource(R.string.recognition_empty_kept_prior)
 
     var showPropertiesSheet by remember { mutableStateOf(false) }
     var menuExpanded by remember { mutableStateOf(false) }
@@ -142,6 +144,8 @@ fun NoteEditorScreen(
                 val msg = when (state.message) {
                     "no_strokes" -> noStrokesMessage
                     "no_new_strokes" -> noNewStrokesMessage
+                    "recognition_empty_no_prior" -> recognitionEmptyNoPrior
+                    "recognition_empty_kept_prior" -> recognitionEmptyKeptPrior
                     else -> state.message
                 }
                 snackbarHostState.showSnackbar(msg)
@@ -201,20 +205,6 @@ fun NoteEditorScreen(
                                 },
                             )
                             HorizontalDivider()
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.recognition_action_rerun_all)) },
-                                onClick = {
-                                    menuExpanded = false
-                                    viewModel.recognizeAllHandwriting()
-                                },
-                            )
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.recognition_action_by_lines)) },
-                                onClick = {
-                                    menuExpanded = false
-                                    viewModel.recognizeBlocks()
-                                },
-                            )
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.editor_clear)) },
                                 onClick = {
@@ -432,8 +422,6 @@ private fun HandwritingWorkspace(
 ) {
     val strokes = note?.strokes ?: emptyList()
     val penStrokes = strokes.penStrokesOnly()
-    val recognizedIds = note?.recognizedStrokeIds ?: emptySet()
-    val hasNewStrokes = penStrokes.any { it.id !in recognizedIds }
     val isBusy = recognitionState == RecognitionState.Recognizing ||
         recognitionState == RecognitionState.DownloadingModel
 
@@ -442,10 +430,7 @@ private fun HandwritingWorkspace(
     val selectedWidth by viewModel.selectedWidth.collectAsStateWithLifecycle()
     val redoStack by viewModel.redoStack.collectAsStateWithLifecycle()
 
-    val onPrimaryRecognize = {
-        if (hasNewStrokes) viewModel.recognizeNewHandwriting()
-        else viewModel.recognizeAllHandwriting()
-    }
+    val onPrimaryRecognize = { viewModel.recognizeHandwriting() }
 
     Column(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         HandwritingToolbar(

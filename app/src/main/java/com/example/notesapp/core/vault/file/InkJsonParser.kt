@@ -1,6 +1,7 @@
 package com.example.notesapp.core.vault.file
 
 import android.util.Log
+import com.example.notesapp.core.model.BlockRecognitionStatus
 import com.example.notesapp.core.model.HandwritingBlock
 import com.example.notesapp.core.model.InkStroke
 import com.example.notesapp.core.model.StrokeBounds
@@ -98,6 +99,12 @@ object InkJsonParser {
                     maxX = boundsObj.getDouble("maxX").toFloat(),
                     maxY = boundsObj.getDouble("maxY").toFloat(),
                 )
+                val candArr = b.optJSONArray("recognitionCandidates")
+                val candidates = if (candArr != null) {
+                    (0 until candArr.length()).map { idx -> candArr.getString(idx) }
+                } else {
+                    emptyList()
+                }
                 HandwritingBlock(
                     id = b.optString("id").ifEmpty { UUID.randomUUID().toString() },
                     strokeIds = strokeIds,
@@ -105,6 +112,10 @@ object InkJsonParser {
                     recognizedText = b.optString("recognizedText", ""),
                     orderIndex = b.optInt("orderIndex", 0),
                     updatedAt = b.optLong("updatedAt", System.currentTimeMillis()),
+                    recognitionCandidates = candidates,
+                    recognitionStatus = BlockRecognitionStatus.fromJson(
+                        b.optString("recognitionStatus").takeIf { it.isNotEmpty() },
+                    ),
                 )
             } catch (e: Exception) {
                 Log.w(TAG, "parse block failed: ${e.message}")
@@ -149,6 +160,12 @@ object InkJsonParser {
         b.put("recognizedText", block.recognizedText)
         b.put("orderIndex", block.orderIndex)
         b.put("updatedAt", block.updatedAt)
+        b.put("recognitionStatus", BlockRecognitionStatus.toJson(block.recognitionStatus))
+        val candArr = JSONArray()
+        for (c in block.recognitionCandidates) {
+            candArr.put(c)
+        }
+        b.put("recognitionCandidates", candArr)
         return b
     }
 }

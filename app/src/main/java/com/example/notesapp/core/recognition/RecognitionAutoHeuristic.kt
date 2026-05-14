@@ -7,6 +7,10 @@ import java.lang.Character
  *
  * Старая логика «любая кириллица в ответе ru → всегда ru» ломала латиницу: русская модель часто даёт
  * 1–2 случайные кириллические буквы на английском слове, и тогда выбирался мусор вместо en.
+ *
+ * **Пропись:** английская модель по тем же штрихам часто выдаёт длинный транслит и «выигрывает» по
+ * числовым оценкам — тогда выбирается мусор вместо читаемой кириллицы из ru. Поэтому при явном
+ * преобладании кириллицы в ru и почти полном отсутствии кириллицы в en принудительно берём ru.
  */
 internal fun pickBestRussianEnglishAuto(ruResult: String, enResult: String): String {
     val ru = ruResult.trim()
@@ -19,12 +23,27 @@ internal fun pickBestRussianEnglishAuto(ruResult: String, enResult: String): Str
     val ruLat = ru.countUnicodeScript(Character.UnicodeScript.LATIN)
     val enLat = en.countUnicodeScript(Character.UnicodeScript.LATIN)
 
+    // Длинная кириллическая фраза + «английский» ответ почти без кириллицы — почти всегда транслит.
+    if (enCyr <= 2 && ruCyr >= 10) return ru
+
+    // Сильное преимущество ru по кириллице при слабом кириллическом сигнале в en.
+    if (ruCyr >= enCyr + 8 && enCyr <= 3 && ruCyr >= 8) return ru
+
     val confRu = ruCyr * 15 + ruLat * 2
     val confEn = enLat * 8 + enCyr * 3
+
+    val nearTie = kotlin.math.abs(confRu - confEn) <= 10
 
     return when {
         confRu > confEn + 3 -> ru
         confEn > confRu + 3 -> en
+        nearTie && (ruCyr >= 1 || enCyr >= 1) -> when {
+            ruCyr > enCyr -> ru
+            enCyr > ruCyr -> en
+            ruCyr == 0 && enCyr == 0 && enLat >= ruLat -> en
+            ru.length >= en.length -> ru
+            else -> en
+        }
         ruCyr > enCyr -> ru
         enCyr > ruCyr -> en
         ruCyr >= 2 -> ru
